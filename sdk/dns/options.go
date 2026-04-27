@@ -7,14 +7,21 @@ import (
 )
 
 // Options configures New(). Every field is optional; defaults are
-// chosen so the typical worker can call New(Options{}) and get a
-// sensible production-ready resolver wired to dns-service via the
-// DNS_SERVICE_URL env var.
+// chosen so a typical worker calls New(Options{}) and gets a
+// resolver that goes through the system /etc/resolv.conf — which in
+// production points at dns-service:53 via the docker-compose `dns:`
+// directive. The shared cache works transparently; no code change
+// needed in the worker.
+//
+// HTTPBackend mode (ServiceURL non-empty) stays around for two
+// niche cases:
+//   - dev laptops outside the docker network where /etc/resolv.conf
+//     can't reach dns-service:53
+//   - debug paths where seeing the JSON response is useful
 type Options struct {
-	// ServiceURL points at dns-service's HTTP listener. Empty value
-	// (and unset DNS_SERVICE_URL env) skips the HTTPBackend and
-	// returns a pure-local resolver — suitable for tests and offline
-	// dev.
+	// ServiceURL, when non-empty, switches to the HTTPBackend.
+	// Empty value (default) uses the stdlib net.Resolver which
+	// resolves via the system /etc/resolv.conf.
 	ServiceURL string
 	// HTTPClient overrides the default. Used by callers that want
 	// keep-alive tuning, custom timeouts, or instrumentation.
