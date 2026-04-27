@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/reconmesh/worker-sdk/sdk/tracing"
 )
 
 // Serve is the worker's entry point. It:
@@ -66,6 +68,19 @@ func Serve(t Tool) {
 		syscall.SIGINT, syscall.SIGTERM,
 	)
 	defer cancel()
+
+	// OTel tracing — no-op when OTEL_EXPORTER_OTLP_ENDPOINT is unset.
+	// Workers in dev or behind a private network skip the exporter
+	// entirely; OTel-enabled deployments get spans around every Run.
+	tracingShutdown, terr := tracing.Init(ctx, manifest.Tool, logger)
+	if terr != nil {
+		logger.Warn("tracing init", "error", terr)
+	}
+	defer func() {
+		shutCtx, c := context.WithTimeout(context.Background(), 5*time.Second)
+		defer c()
+		_ = tracingShutdown(shutCtx)
+	}()
 
 	rt, err := newRuntime(ctx, runtimeOptions{
 		Tool:       t,

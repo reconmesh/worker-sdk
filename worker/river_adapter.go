@@ -12,7 +12,11 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/reconmesh/worker-sdk/sdk/metrics"
+	"github.com/reconmesh/worker-sdk/sdk/tracing"
 )
 
 // cascadeWorker bridges River's typed worker contract to the user-
@@ -86,10 +90,22 @@ func (w *cascadeWorker) Work(ctx context.Context, j *river.Job[CascadeArgs]) err
 	start := time.Now()
 	tool := w.tool.Name()
 	phase := j.Args.Phase
+
+	// OTel span around Run(). No-op when tracing isn't configured —
+	// otel.Tracer returns the global no-op provider in that case.
+	tr := tracing.Tracer("reconmesh/worker")
+	ctx, span := tr.Start(ctx, "Tool.Run", trace.WithAttributes(
+		attribute.String("reconmesh.tool", tool),
+		attribute.String("reconmesh.phase", phase),
+		attribute.String("reconmesh.asset_id", j.Args.AssetID.String()),
+	))
+	defer span.End()
+
 	res, err := w.tool.Run(ctx, job)
 	metrics.JobDuration.WithLabelValues(tool, phase).Observe(time.Since(start).Seconds())
 	if err != nil {
 		metrics.JobsTotal.WithLabelValues(tool, phase, "error").Inc()
+		span.RecordError(err)
 		// IsFatal short-circuits retries; River sees the error and
 		// dead-letters via the type sentinel.
 		if IsFatal(err) {
