@@ -52,10 +52,13 @@ type cascadeWorker struct {
 // IsTransient / IsFatal so the runtime gets the right outcome:
 // transient → re-queued with backoff, fatal → dead-letter.
 func (w *cascadeWorker) Work(ctx context.Context, j *river.Job[CascadeArgs]) error {
-	if j.Args.Phase != w.phase {
-		// Belt-and-braces: the queue routing already split jobs by
-		// phase; getting the wrong one means a misconfigured queue
-		// name. Loud failure beats silent run.
+	// Empty w.phase = multi-phase worker; the queue routing has
+	// already filtered to phases this Tool subscribes to and a
+	// strict equality check would fatal-error every phase past the
+	// first one. Single-phase workers keep the belt-and-braces
+	// check — the queue routing should have split jobs by phase
+	// already, so a mismatch means a misconfigured queue name.
+	if w.phase != "" && j.Args.Phase != w.phase {
 		return fmt.Errorf("phase mismatch: got %q, registered for %q",
 			j.Args.Phase, w.phase)
 	}
@@ -184,31 +187,34 @@ func startConsumer(ctx context.Context, pool *pgxpool.Pool, manifest *Manifest, 
 		}
 	}
 	// One shared cascadeWorker handles every phase — Args.Kind() is
-	// constant ("reconmesh.cascade.v1"). The per-phase phase field
-	// check inside Work catches misroutes; queue routing ensures we
-	// only see jobs for our subscribed phases.
-	if len(manifest.Phases) > 0 {
-		// The "phase" stored on the worker is just the FIRST phase;
-		// it's used only as a sanity-check label in Work. The actual
-		// dispatch field is j.Args.Phase. We special-case multi-phase
-		// workers below.
+	// constant ("reconmesh.cascade.v1"). Per-phase isolation comes
+	// from the Queue routing in QueueConfig above: a worker only
+	// pulls jobs from queues it's subscribed to. The strict
+	// j.Args.Phase == w.phase check inside Work() is belt-and-braces
+	// for SINGLE-phase manifests (catches router glitches if the
+	// producer set the wrong queue name); for MULTI-phase manifests
+	// we set w.phase = "" so Work() skips the equality check, since
+	// every accepted job legitimately comes through one of our
+	// subscribed queues.
+	switch n := len(manifest.Phases); {
+	case n == 0:
+		// No phases — nothing to register. Worker boots, heartbeats,
+		// and waits for an admin to add a phase via manifest update.
+	case n == 1:
 		river.AddWorker(workers, &cascadeWorker{
 			tool:   tool,
 			writer: writer,
 			logger: logger,
 			phase:  manifest.Phases[0].Name,
 		})
-	}
-
-	// In multi-phase setups, the phase-mismatch check would always
-	// fail for the second phase. Solution: relax the check when the
-	// manifest declares multiple phases. The check still catches
-	// router glitches in single-phase workers (the common case).
-	if len(manifest.Phases) > 1 {
-		// Replace the worker registered above with a permissive one
-		// that doesn't enforce the phase label.
-		// (Functions over methods for the override since River's
-		// AddWorker takes a value, not an interface.)
+	default:
+		// Multi-phase: empty phase label disables the strict check.
+		river.AddWorker(workers, &cascadeWorker{
+			tool:   tool,
+			writer: writer,
+			logger: logger,
+			// phase intentionally empty
+		})
 	}
 
 	rc, err := river.NewClient(riverpgxv5.New(pool), &river.Config{
