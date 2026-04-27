@@ -1,0 +1,25 @@
+# Dependabot for a Go worker / service. Bumps go.mod deps weekly and
+# opens PRs the CI runs against. The merge is human-gated (we don't
+# auto-merge) since projectdiscovery libs occasionally introduce
+# breaking API shifts.
+
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["deps", "go"]
+    open-pull-requests-limit: 10
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["deps", "ci"]
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["deps", "docker"]
