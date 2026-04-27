@@ -118,6 +118,14 @@ type Job struct {
 	// TraceID is already set on ctx via OTel. Exposed here for
 	// log-only use cases where the trace context isn't propagated.
 	TraceID string
+	// ForceFresh signals the operator triggered this run manually and
+	// wants live data — caches (httpcache.Lookup, dns-service LRU,
+	// in-memory tool-side memo, …) MUST be bypassed for this Job.
+	// Tools that don't cache anything can ignore this field; tools
+	// that cache should branch on it BEFORE the cache lookup, then
+	// still write to the cache after the fresh fetch so future
+	// non-fresh callers benefit.
+	ForceFresh bool
 }
 
 // Result is the output of Tool.Run.

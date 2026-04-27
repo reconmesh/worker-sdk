@@ -23,6 +23,11 @@ type CascadeArgs struct {
 	Phase     string    `json:"phase"`
 	RunID     uuid.UUID `json:"run_id,omitempty"`
 	EventType string    `json:"event_type,omitempty"`
+	// ForceFresh tells the worker to bypass any local / shared cache
+	// (httpcache, dns-service LRU, …) and re-fetch from origin. Set
+	// by manual rescan / scan endpoints; cron leaves it false so the
+	// recheck wave benefits from warm caches.
+	ForceFresh bool `json:"force_fresh,omitempty"`
 }
 
 // Kind satisfies river.JobArgs. River dispatches jobs to the worker

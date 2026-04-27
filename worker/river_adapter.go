@@ -73,12 +73,13 @@ func (w *cascadeWorker) Work(ctx context.Context, j *river.Job[CascadeArgs]) err
 	}
 
 	job := Job{
-		ID:        j.ID,
-		RunID:     j.Args.RunID.String(),
-		ScopeID:   j.Args.ScopeID.String(),
-		Phase:     j.Args.Phase,
-		Asset:     *asset,
-		Priority:  j.Priority,
+		ID:         j.ID,
+		RunID:      j.Args.RunID.String(),
+		ScopeID:    j.Args.ScopeID.String(),
+		Phase:      j.Args.Phase,
+		Asset:      *asset,
+		Priority:   j.Priority,
+		ForceFresh: j.Args.ForceFresh,
 		// Job deadline = River's attempt timeout (River sets it via
 		// timeoutFunc; ctx already carries it). We expose it for
 		// tools that want to compute their own internal budgets.
