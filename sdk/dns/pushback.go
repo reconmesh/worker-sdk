@@ -67,3 +67,67 @@ func PushRecords(ctx context.Context, baseURL string, records []DiscoveredRecord
 	}
 	return nil
 }
+
+// BulkResolution is one entry in BulkResolve's response. CNAME may be
+// empty when the host has no alias; A / AAAA may be empty when the
+// host has no record of that type or the cache miss flowed through
+// to a pool error captured in Error.
+type BulkResolution struct {
+	Host  string   `json:"host"`
+	A     []string `json:"a,omitempty"`
+	AAAA  []string `json:"aaaa,omitempty"`
+	CNAME string   `json:"cname,omitempty"`
+	Error string   `json:"error,omitempty"`
+}
+
+// BulkResolve fans out N hostname resolutions in one HTTP request,
+// returning the parallel result set. dns-service does the work in
+// parallel internally (32-way) so a 1000-host call typically finishes
+// in single-digit seconds when most are cached.
+//
+// Pre-warming (caller ignores the returned slice): pass `types: nil`
+// to populate every cache layer for the listed hosts before a heavy
+// phase wave kicks off. The persisted answers serve subsequent worker
+// queries as PG hits.
+//
+// Bulk lookup (caller uses the returned slice): pass the explicit
+// types you need ("A", "AAAA", "CNAME") to avoid populating extras.
+//
+// Hard cap of 10000 hosts per request — chunk before calling on
+// larger workloads.
+func BulkResolve(ctx context.Context, baseURL string, hosts []string, types []string) ([]BulkResolution, error) {
+	if len(hosts) == 0 {
+		return nil, nil
+	}
+	if baseURL == "" {
+		baseURL = "http://dns-service:7080"
+	}
+	body, err := json.Marshal(map[string]any{
+		"hosts": hosts,
+		"types": types,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("bulk resolve: marshal: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		baseURL+"/v1/resolve/bulk", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	cli := &http.Client{Timeout: 60 * time.Second}
+	resp, err := cli.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("bulk resolve: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		return nil, fmt.Errorf("bulk resolve: HTTP %d", resp.StatusCode)
+	}
+	var out []BulkResolution
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("bulk resolve: decode: %w", err)
+	}
+	return out, nil
+}
