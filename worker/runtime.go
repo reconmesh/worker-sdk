@@ -130,9 +130,126 @@ func (rt *runtime) Run(ctx context.Context) error {
 
 	go rt.heartbeatLoop(ctx)
 
+	// Fire ReloadConfig once at boot with the merged manifest⊕override
+	// config, then LISTEN for live edits. Skipped silently when the
+	// Tool doesn't implement Configurable — the SDK doesn't force
+	// every worker to opt in.
+	if _, ok := rt.tool.(Configurable); ok {
+		if err := rt.applyConfig(ctx); err != nil {
+			rt.logger.Warn("initial config load",
+				"tool", rt.manifest.Tool, "error", err)
+		}
+		go rt.configLoop(ctx)
+	}
+
 	<-ctx.Done()
 	rt.logger.Info("worker shutdown begin")
 	return rt.shutdown()
+}
+
+// applyConfig reads tool_configs.config for this tool, deep-merges
+// it onto the manifest's static config, and hands the result to
+// Tool.ReloadConfig. Best-effort — a transient PG error logs and
+// returns; the worker keeps running with whatever config it had.
+//
+// Merge rule (mirrors controlplane/internal/api/plugins.go):
+// override wins on key conflict; nested maps recurse; arrays /
+// scalars in override replace the manifest value wholesale.
+func (rt *runtime) applyConfig(ctx context.Context) error {
+	cfg, ok := rt.tool.(Configurable)
+	if !ok {
+		return nil
+	}
+	merged := rt.fetchMergedConfig(ctx)
+	loadCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	return cfg.ReloadConfig(loadCtx, merged)
+}
+
+func (rt *runtime) fetchMergedConfig(ctx context.Context) map[string]any {
+	out := map[string]any{}
+	for k, v := range rt.manifest.Config {
+		out[k] = v
+	}
+	var raw []byte
+	err := rt.pool.QueryRow(ctx,
+		`SELECT config FROM tool_configs WHERE tool = $1`,
+		rt.manifest.Tool).Scan(&raw)
+	if err != nil || len(raw) == 0 {
+		return out
+	}
+	var override map[string]any
+	if jerr := json.Unmarshal(raw, &override); jerr == nil {
+		out = mergeConfigInto(out, override)
+	}
+	return out
+}
+
+// mergeConfigInto deep-merges b over a, returning a new map (a is
+// not mutated). Mirrors the controlplane's behavior so what the UI
+// shows as "effective" is exactly what the worker sees.
+func mergeConfigInto(a, b map[string]any) map[string]any {
+	out := make(map[string]any, len(a)+len(b))
+	for k, v := range a {
+		out[k] = v
+	}
+	for k, v := range b {
+		if vmap, vok := v.(map[string]any); vok {
+			if existing, eok := out[k].(map[string]any); eok {
+				out[k] = mergeConfigInto(existing, vmap)
+				continue
+			}
+		}
+		out[k] = v
+	}
+	return out
+}
+
+// configLoop subscribes to PG NOTIFY 'tool_config_changed' and fires
+// ReloadConfig whenever the operator edits this tool's override.
+// One LISTEN connection per worker — cheap; pgx pool reserves it.
+func (rt *runtime) configLoop(ctx context.Context) {
+	conn, err := rt.pool.Acquire(ctx)
+	if err != nil {
+		rt.logger.Warn("config listen: acquire", "error", err)
+		return
+	}
+	defer conn.Release()
+	if _, err := conn.Exec(ctx, `LISTEN tool_config_changed`); err != nil {
+		rt.logger.Warn("config listen: LISTEN", "error", err)
+		return
+	}
+	for {
+		notif, err := conn.Conn().WaitForNotification(ctx)
+		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			rt.logger.Warn("config listen: notify", "error", err)
+			// Reconnect attempt: brief backoff, then re-acquire +
+			// re-LISTEN. Keeps the worker reactive across PG flaps.
+			time.Sleep(2 * time.Second)
+			conn.Release()
+			conn, err = rt.pool.Acquire(ctx)
+			if err != nil {
+				return
+			}
+			_, _ = conn.Exec(ctx, `LISTEN tool_config_changed`)
+			continue
+		}
+		// Payload is the bare tool name. Skip notifications for other
+		// tools so a 100-tool cluster doesn't trigger 100 reloads on
+		// every edit.
+		if notif.Payload != rt.manifest.Tool {
+			continue
+		}
+		if err := rt.applyConfig(ctx); err != nil {
+			rt.logger.Warn("config reload",
+				"tool", rt.manifest.Tool, "error", err)
+		} else {
+			rt.logger.Info("config reloaded", "tool", rt.manifest.Tool)
+		}
+	}
 }
 
 // registerWorker UPSERTs into the workers table so the control

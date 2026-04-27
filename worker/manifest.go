@@ -27,6 +27,13 @@ type Manifest struct {
 	// Maintainer is a free-form team or individual identifier surfaced
 	// in the UI. Optional.
 	Maintainer string `yaml:"maintainer,omitempty"`
+	// Config is the static defaults the tool ships with. Operator
+	// overrides land in PG (tool_configs) and the SDK runtime
+	// deep-merges override over Config before invoking
+	// Configurable.ReloadConfig. Free-form on purpose — each tool
+	// owns its own config schema. Surfaced in /api/plugins so the
+	// UI can show defaults vs override.
+	Config map[string]any `yaml:"config,omitempty"`
 	// Phases declares one or more pipeline phases this worker handles.
 	// A single binary can serve several phases by branching in Run on
 	// Job.Phase; this is rare in practice.

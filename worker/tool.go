@@ -62,6 +62,29 @@ type Updatable interface {
 	Update(ctx context.Context) error
 }
 
+// Configurable is an optional interface that lets a Tool re-read its
+// runtime config without restarting the process. The SDK runtime
+// invokes ReloadConfig:
+//
+//   1. Once at boot, after the worker registers with the cluster,
+//      with the deep-merged config (manifest defaults ⊕ operator
+//      override from the tool_configs PG table).
+//   2. Every time the operator edits the override via the UI / API,
+//      driven by PG NOTIFY 'tool_config_changed'. The runtime's
+//      LISTEN goroutine fires ReloadConfig on receipt.
+//
+// The map carries the FULL effective config (every key the worker
+// would see at boot). Tools that hold mutable state (resolver pool,
+// thread caps, API keys) swap it under their own mutex so jobs
+// already in flight see consistent values for their duration but
+// new jobs pick up the change.
+//
+// Returning an error logs but doesn't crash the worker — bad config
+// can be rolled back by the operator from the same UI.
+type Configurable interface {
+	ReloadConfig(ctx context.Context, cfg map[string]any) error
+}
+
 // Job is the input to Tool.Run.
 //
 // Field stability: every field here is part of the wire contract.
