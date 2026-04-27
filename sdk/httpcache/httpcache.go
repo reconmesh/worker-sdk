@@ -51,6 +51,21 @@ type Entry struct {
 	FetchedAt     time.Time
 	ETag          string
 	LastModified  string
+	// BodySHA256 is the SHA-256 of Body. Computed on Upsert; populated
+	// on Lookup so callers comparing two entries don't have to rehash.
+	// Nil for rows written before migration 0003 (organic backfill on
+	// next fetch). Length 32 when set.
+	BodySHA256 []byte
+}
+
+// UpsertResult reports whether the body changed since the prior write
+// for this URL. Callers use it to emit asset_event "url_body_changed"
+// or skip a downstream re-analysis. First-write behavior:
+// PreviousSHA256 nil, Changed false — establishes the baseline.
+type UpsertResult struct {
+	PreviousSHA256 []byte // nil on first fetch
+	Changed        bool   // true when prior existed and bytes differ
+	SizeDelta      int    // new BodySize - prior body_size
 }
 
 // Cache wraps the PG-backed body cache with a simple Lookup/Upsert
@@ -102,10 +117,11 @@ var (
 	cntLookupMiss  = prometheus.NewCounter(prometheus.CounterOpts{Name: "reconmesh_httpcache_lookups_miss_total", Help: "Body-cache lookups with no row, an expired row, or a backend error."})
 	cntLookupStale = prometheus.NewCounter(prometheus.CounterOpts{Name: "reconmesh_httpcache_lookups_stale_total", Help: "Body-cache lookups that found a row past StaleAfter (treated as a miss)."})
 	cntUpsert      = prometheus.NewCounter(prometheus.CounterOpts{Name: "reconmesh_httpcache_upserts_total", Help: "Body-cache writes (one per cached response)."})
+	cntBodyChanged = prometheus.NewCounter(prometheus.CounterOpts{Name: "reconmesh_httpcache_body_changed_total", Help: "Upserts where the new body sha256 differed from the prior — drives Phase 3 url_body_changed asset events."})
 )
 
 func init() {
-	prometheus.MustRegister(cntLookupHit, cntLookupMiss, cntLookupStale, cntUpsert)
+	prometheus.MustRegister(cntLookupHit, cntLookupMiss, cntLookupStale, cntUpsert, cntBodyChanged)
 }
 
 // New opens (or reuses) a pgxpool against dsn. Caller owns the
@@ -213,7 +229,7 @@ func (c *Cache) Lookup(ctx context.Context, rawURL string) (*Entry, error) {
 	const q = `
 		SELECT url, final_url, status_code, content_type, content_length,
 		       headers, body, body_size, redirect_chain,
-		       fetched_at, etag, last_modified
+		       fetched_at, etag, last_modified, body_sha256
 		  FROM tm_http_bodies
 		 WHERE url_hash = $1`
 	var (
@@ -224,11 +240,12 @@ func (c *Cache) Lookup(ctx context.Context, rawURL string) (*Entry, error) {
 		lm        *string
 		ct        *string
 		fu        *string
+		sha       []byte
 	)
 	err := c.pool.QueryRow(ctx, q, hash).Scan(
 		&e.URL, &fu, &e.StatusCode, &ct, &e.ContentLength,
 		&rawHeader, &e.Body, &e.BodySize, &rawChain,
-		&e.FetchedAt, &etag, &lm,
+		&e.FetchedAt, &etag, &lm, &sha,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		cntLookupMiss.Inc()
@@ -262,36 +279,122 @@ func (c *Cache) Lookup(ctx context.Context, rawURL string) (*Entry, error) {
 	if len(rawChain) > 0 {
 		_ = json.Unmarshal(rawChain, &e.RedirectChain)
 	}
+	if len(sha) > 0 {
+		e.BodySHA256 = sha
+	}
 	return &e, nil
 }
 
 // Upsert writes (or refreshes) an entry. Idempotent on the url_hash
 // PK — re-fetching the same URL within a wave overwrites the prior
 // row, including fetched_at so freshness rolls forward.
-func (c *Cache) Upsert(ctx context.Context, e *Entry) error {
+func (c *Cache) Upsert(ctx context.Context, e *Entry) (*UpsertResult, error) {
 	if e == nil || e.URL == "" {
-		return errors.New("httpcache: entry.URL required")
+		return nil, errors.New("httpcache: entry.URL required")
 	}
 	hash := urlHash(e.URL)
 	headerJSON, err := json.Marshal(e.Headers)
 	if err != nil {
-		return fmt.Errorf("httpcache: headers: %w", err)
+		return nil, fmt.Errorf("httpcache: headers: %w", err)
 	}
 	chainJSON, err := json.Marshal(e.RedirectChain)
 	if err != nil {
-		return fmt.Errorf("httpcache: chain: %w", err)
+		return nil, fmt.Errorf("httpcache: chain: %w", err)
 	}
 	bodySize := e.BodySize
 	if bodySize == 0 {
 		bodySize = len(e.Body)
 	}
+	// Compute SHA on the canonicalized body bytes. This is what Phase 3
+	// uses to detect change between fetches; the column is also indexed
+	// (partial) so future "find every URL whose body matched X" queries
+	// stay cheap.
+	sum := sha256.Sum256(e.Body)
+	newSHA := sum[:]
+	e.BodySHA256 = newSHA
+
+	res := &UpsertResult{}
+
+	// One transaction so the history INSERT and the bodies UPSERT are
+	// atomic — a crash mid-flow either leaves the prior state intact
+	// or commits the whole change.
+	tx, err := c.pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("httpcache: begin: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }() // safe after Commit
+
+	// Read the prior row (if any) for the diff. We snapshot its
+	// payload columns so the history INSERT can capture them WITHOUT
+	// duplicating the latest-row body — the history row stores the
+	// PRIOR content, not the new one.
+	var (
+		priorSHA       []byte
+		priorBody      []byte
+		priorSize      int
+		priorStatus    int
+		priorCT        *string
+		priorHeaders   []byte
+		priorFetchedAt time.Time
+		hasPrior       bool
+	)
+	err = tx.QueryRow(ctx, `
+		SELECT body_sha256, body, body_size, status_code,
+		       content_type, headers, fetched_at
+		  FROM tm_http_bodies
+		 WHERE url_hash = $1`, hash).Scan(
+		&priorSHA, &priorBody, &priorSize, &priorStatus,
+		&priorCT, &priorHeaders, &priorFetchedAt,
+	)
+	switch {
+	case err == nil:
+		hasPrior = true
+	case errors.Is(err, pgx.ErrNoRows):
+		// First fetch — fall through.
+	default:
+		return nil, fmt.Errorf("httpcache: prior lookup: %w", err)
+	}
+
+	// Decide whether the body changed. We treat "prior had no SHA"
+	// (pre-migration row) as "unknown" — same body bytes are treated
+	// as unchanged, but if priorSHA is nil we compute it inline so
+	// the comparison still works.
+	if hasPrior {
+		if len(priorSHA) == 0 {
+			ps := sha256.Sum256(priorBody)
+			priorSHA = ps[:]
+		}
+		if !bytesEqual(priorSHA, newSHA) {
+			res.Changed = true
+			res.PreviousSHA256 = priorSHA
+			res.SizeDelta = bodySize - priorSize
+			// Snapshot the prior version into history. Trigger
+			// `tm_http_body_history_trim_trg` enforces the 3-row cap.
+			ct := ""
+			if priorCT != nil {
+				ct = *priorCT
+			}
+			if _, herr := tx.Exec(ctx, `
+				INSERT INTO tm_http_body_history
+				    (url_hash, fetched_at, body, body_size, body_sha256,
+				     status_code, content_type, headers)
+				VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7, ''), $8::jsonb)
+				ON CONFLICT (url_hash, fetched_at) DO NOTHING`,
+				hash, priorFetchedAt, priorBody, priorSize, priorSHA,
+				priorStatus, ct, priorHeaders,
+			); herr != nil {
+				return nil, fmt.Errorf("httpcache: history insert: %w", herr)
+			}
+		}
+	}
+
 	const upsert = `
 		INSERT INTO tm_http_bodies
 		    (url_hash, url, final_url, status_code, content_type,
 		     content_length, headers, body, body_size, redirect_chain,
-		     fetched_at, etag, last_modified)
+		     fetched_at, etag, last_modified, body_sha256)
 		VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10::jsonb,
-		        NOW(), NULLIF($11, ''), NULLIF($12, ''))
+		        NOW(), NULLIF($11, ''), NULLIF($12, ''), $13)
 		ON CONFLICT (url_hash) DO UPDATE
 		   SET url            = EXCLUDED.url,
 		       final_url      = EXCLUDED.final_url,
@@ -304,16 +407,37 @@ func (c *Cache) Upsert(ctx context.Context, e *Entry) error {
 		       redirect_chain = EXCLUDED.redirect_chain,
 		       fetched_at     = NOW(),
 		       etag           = EXCLUDED.etag,
-		       last_modified  = EXCLUDED.last_modified`
-	_, err = c.pool.Exec(ctx, upsert,
+		       last_modified  = EXCLUDED.last_modified,
+		       body_sha256    = EXCLUDED.body_sha256`
+	_, err = tx.Exec(ctx, upsert,
 		hash, e.URL, e.FinalURL, e.StatusCode, e.ContentType,
 		e.ContentLength, string(headerJSON), e.Body, bodySize, string(chainJSON),
-		e.ETag, e.LastModified,
+		e.ETag, e.LastModified, newSHA,
 	)
-	if err == nil {
-		cntUpsert.Inc()
+	if err != nil {
+		return nil, fmt.Errorf("httpcache: upsert: %w", err)
 	}
-	return err
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("httpcache: commit: %w", err)
+	}
+	cntUpsert.Inc()
+	if res.Changed {
+		cntBodyChanged.Inc()
+	}
+	return res, nil
+}
+
+func bytesEqual(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // urlHash canonicalizes the URL (lowercase scheme+host, drop default
