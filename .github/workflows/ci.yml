@@ -1,5 +1,8 @@
 name: ci
-on: [push, pull_request]
+# Disabled: reconmesh org policy blocks third-party actions.
+# Re-enable by reverting to: on: [push, pull_request]
+on:
+  workflow_dispatch:
 
 permissions:
   contents: read
