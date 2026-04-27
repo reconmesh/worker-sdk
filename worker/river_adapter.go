@@ -11,6 +11,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+
+	"github.com/reconmesh/worker-sdk/sdk/metrics"
 )
 
 // cascadeWorker bridges River's typed worker contract to the user-
@@ -81,14 +83,26 @@ func (w *cascadeWorker) Work(ctx context.Context, j *river.Job[CascadeArgs]) err
 		job.Deadline = dl
 	}
 
+	start := time.Now()
+	tool := w.tool.Name()
+	phase := j.Args.Phase
 	res, err := w.tool.Run(ctx, job)
+	metrics.JobDuration.WithLabelValues(tool, phase).Observe(time.Since(start).Seconds())
 	if err != nil {
+		metrics.JobsTotal.WithLabelValues(tool, phase, "error").Inc()
 		// IsFatal short-circuits retries; River sees the error and
 		// dead-letters via the type sentinel.
 		if IsFatal(err) {
 			return river.JobCancel(err)
 		}
 		return err
+	}
+	metrics.JobsTotal.WithLabelValues(tool, phase, "ok").Inc()
+	for _, a := range res.NewAssets {
+		metrics.AssetsEmitted.WithLabelValues(tool, phase, a.Kind).Inc()
+	}
+	for _, f := range res.Findings {
+		metrics.FindingsEmitted.WithLabelValues(tool, phase, string(f.Severity)).Inc()
 	}
 
 	if err := w.persist(ctx, j.Args, res); err != nil {

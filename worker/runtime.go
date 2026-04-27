@@ -18,6 +18,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 
+	"github.com/reconmesh/worker-sdk/sdk/metrics"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -356,6 +358,10 @@ func (rt *runtime) startAdmin() error {
 		_ = json.NewEncoder(w).Encode(rt.manifest)
 	})
 	mux.HandleFunc("/admin/update", rt.handleAdminUpdate)
+	// Prometheus metrics — labels carry tool + phase + outcome.
+	// Mounted on the same admin port so a single scrape config
+	// covers every replica without per-worker port-mapping.
+	mux.Handle("/metrics", metrics.Handler())
 
 	rt.admin = &http.Server{
 		Addr:              rt.adminAddr,
