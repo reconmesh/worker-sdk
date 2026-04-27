@@ -103,9 +103,9 @@ func (w *AssetWriter) UpsertAsset(ctx context.Context, scopeID uuid.UUID, parent
 		VALUES ($1, $2, $3, $4, $5::jsonb, $6, 'discovered')
 		ON CONFLICT (scope_id, kind, value) DO UPDATE
 		   SET attrs       = assets.attrs || EXCLUDED.attrs,
-		       fingerprint = $7,
+		       fingerprint = $6,
 		       last_seen   = NOW()
-		   WHERE assets.fingerprint IS DISTINCT FROM $7
+		   WHERE assets.fingerprint IS DISTINCT FROM $6
 		      OR assets.last_seen   < NOW() - interval '1 minute'`
 	// Why the merge formula `assets.attrs || EXCLUDED.attrs`: workers
 	// often only know about the keys they own (tm-resolve writes
@@ -113,15 +113,18 @@ func (w *AssetWriter) UpsertAsset(ctx context.Context, scopeID uuid.UUID, parent
 	// EXCLUDED.attrs would wipe everything else. JSONB || preserves
 	// all existing keys, overwrites the ones we set.
 	//
-	// The recomputed fingerprint $7 is the hash of OUR partial attrs;
-	// after merge, the row's actual attrs may differ from what we
-	// hashed. The trigger compares (old fingerprint, new fingerprint)
-	// — if they differ, it emits asset_events. Acceptable: a partial
-	// update from us is still a real change worth recording.
-
-	mergedFP := fingerprintAttrs(attrs)
+	// The fingerprint we write is the hash of OUR partial attrs; after
+	// merge the row's actual attrs may differ from what we hashed.
+	// The trigger compares (old fingerprint, new fingerprint) — if
+	// they differ, it emits asset_events. Acceptable: a partial update
+	// from us is still a real change worth recording.
+	//
+	// Earlier revisions called fingerprintAttrs twice (once for fp,
+	// once for "mergedFP") and bound them to two different placeholders
+	// — the values were always identical so the second sha256 was
+	// pure waste. Now reuse $6 in both INSERT and UPDATE.
 	_, err = w.pool.Exec(ctx, q,
-		scopeID, a.Kind, a.Value, parentArg, string(attrsJSON), fp, mergedFP,
+		scopeID, a.Kind, a.Value, parentArg, string(attrsJSON), fp,
 	)
 	return err
 }
