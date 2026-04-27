@@ -25,6 +25,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Hop is one entry in a redirect chain.
@@ -60,6 +61,20 @@ type Cache struct {
 	// are treated as misses so the caller refetches. Operators tune
 	// down to tighten freshness, up to favor network economy.
 	StaleAfter time.Duration
+}
+
+// Per-process counters. Expose as Prom metrics via the worker-sdk
+// metrics package — incremented on every Lookup / Upsert path so
+// the operator can see "between waves we hit 95% on the body cache".
+var (
+	cntLookupHit   = prometheus.NewCounter(prometheus.CounterOpts{Name: "reconmesh_httpcache_lookups_hit_total", Help: "Body-cache lookups that returned a fresh entry."})
+	cntLookupMiss  = prometheus.NewCounter(prometheus.CounterOpts{Name: "reconmesh_httpcache_lookups_miss_total", Help: "Body-cache lookups with no row, an expired row, or a backend error."})
+	cntLookupStale = prometheus.NewCounter(prometheus.CounterOpts{Name: "reconmesh_httpcache_lookups_stale_total", Help: "Body-cache lookups that found a row past StaleAfter (treated as a miss)."})
+	cntUpsert      = prometheus.NewCounter(prometheus.CounterOpts{Name: "reconmesh_httpcache_upserts_total", Help: "Body-cache writes (one per cached response)."})
+)
+
+func init() {
+	prometheus.MustRegister(cntLookupHit, cntLookupMiss, cntLookupStale, cntUpsert)
 }
 
 // New opens (or reuses) a pgxpool against dsn. Caller owns the
@@ -119,14 +134,18 @@ func (c *Cache) Lookup(ctx context.Context, rawURL string) (*Entry, error) {
 		&e.FetchedAt, &etag, &lm,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
+		cntLookupMiss.Inc()
 		return nil, nil
 	}
 	if err != nil {
+		cntLookupMiss.Inc()
 		return nil, err
 	}
 	if c.StaleAfter > 0 && time.Since(e.FetchedAt) > c.StaleAfter {
+		cntLookupStale.Inc()
 		return nil, nil
 	}
+	cntLookupHit.Inc()
 	if fu != nil {
 		e.FinalURL = *fu
 	}
@@ -193,6 +212,9 @@ func (c *Cache) Upsert(ctx context.Context, e *Entry) error {
 		e.ContentLength, string(headerJSON), e.Body, bodySize, string(chainJSON),
 		e.ETag, e.LastModified,
 	)
+	if err == nil {
+		cntUpsert.Inc()
+	}
 	return err
 }
 
