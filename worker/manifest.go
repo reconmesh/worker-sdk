@@ -62,6 +62,125 @@ type Phase struct {
 	// to 4 (lowest, default). Operators can still override on a
 	// per-run basis.
 	PriorityHint int `yaml:"priority_hint,omitempty"`
+	// UI describes how the web-ui should surface this phase's
+	// observations. Two modes:
+	//
+	//   - declarative: a tab + view spec the front renders generically
+	//     (table of attrs, key-value list, markdown). Default — most
+	//     plugins need nothing more.
+	//   - federated:  a Module Federation remote entry URL the front
+	//     loads at runtime. The remote can render arbitrary React
+	//     components and inject into any of the documented UI slots
+	//     (dashboard, scope-list, scope-overview, host-page).
+	//
+	// Both modes can coexist: a plugin may declare a fallback table
+	// AND a federated component, and the front uses the federated
+	// one when reachable, the declarative one otherwise.
+	UI *UISpec `yaml:"ui,omitempty"`
+}
+
+// UISpec is the contract between a worker and the web-ui. The host
+// reads a connected worker's manifest, builds the navigation, and
+// either renders the declarative views or loads the federated module.
+//
+// Stability: every field here is part of the wire contract. Adding
+// is MINOR, removing is MAJOR (worker authors who depended on a
+// removed field have to update). Renaming a render kind is MAJOR.
+type UISpec struct {
+	// Tab is shown on the host page (and elsewhere depending on
+	// where the plugin's data lives). Required when at least one
+	// view is declared.
+	Tab *UITab `yaml:"tab,omitempty"`
+	// Views are rendered inside the tab. The front composes them
+	// vertically. Each view picks one of the supported render kinds
+	// (table, kv, markdown, tree, link-list, json).
+	Views []UIView `yaml:"views,omitempty"`
+	// Federated, when non-empty, points to a Module Federation
+	// remote entry the front loads at runtime. The remote MAY
+	// expose components for any of these slots:
+	//
+	//   "host-tab"        rendered inside the tab on the host page
+	//   "host-overview"   inserted into the host page's overview block
+	//   "scope-overview"  inserted into the scope dashboard
+	//   "scope-list"      adds a column / badge to the scopes list
+	//   "global-news"     inserts cards into the cross-scope News feed
+	//
+	// The host validates the slot names; unknown slots are ignored
+	// rather than rejected so a newer worker doesn't break older
+	// fronts.
+	Federated *UIFederated `yaml:"federated,omitempty"`
+}
+
+// UITab is the navigation entry. The front turns this into a button
+// in the host-page tab strip with an optional badge.
+type UITab struct {
+	Label string `yaml:"label"`
+	// Lucide / Heroicons name. Front maps to its icon set.
+	Icon string `yaml:"icon,omitempty"`
+	// Badge controls the small bubble on the tab. Supported:
+	//   "count"      number of items in the first table view
+	//   "exists"     ✓ / ✗ on a bool key (configured per view)
+	//   ""           no badge
+	Badge string `yaml:"badge,omitempty"`
+	// AttrsPath: dotted path under assets.attrs where this plugin's
+	// data lives. The front reads the asset row, drills here, and
+	// passes the slice to the view renderers. Required for
+	// declarative views.
+	AttrsPath string `yaml:"attrs_path,omitempty"`
+}
+
+// UIView is one rendered block inside a tab. Kind picks the renderer;
+// the rest of the fields are kind-specific. We don't union-type these
+// in YAML to keep the manifest readable; unused fields are ignored.
+type UIView struct {
+	Kind string `yaml:"kind"` // table | kv | markdown | tree | link-list | json
+	// Title shown above the block. Optional.
+	Title string `yaml:"title,omitempty"`
+
+	// table-specific:
+	Columns []UIColumn `yaml:"columns,omitempty"`
+	Sort    []string   `yaml:"sort,omitempty"`
+	Filters []string   `yaml:"filters,omitempty"`
+
+	// kv-specific:
+	Keys []UIKVKey `yaml:"keys,omitempty"`
+
+	// markdown-specific:
+	// the content lives at the asset's attrs.<attrs_path>.<source>
+	// (assumed to be a markdown string). Empty source = use the
+	// whole node as a string.
+	Source string `yaml:"source,omitempty"`
+}
+
+// UIColumn describes one column in a table view.
+type UIColumn struct {
+	Field     string `yaml:"field"`
+	Label     string `yaml:"label,omitempty"`
+	Align     string `yaml:"align,omitempty"`     // left|right|center
+	Monospace bool   `yaml:"monospace,omitempty"`
+	Mask      bool   `yaml:"mask,omitempty"`      // for secrets: render obscured by default
+	Link      bool   `yaml:"link,omitempty"`      // value rendered as a clickable link
+}
+
+// UIKVKey describes one row in a key-value view.
+type UIKVKey struct {
+	Field string `yaml:"field"`
+	Label string `yaml:"label,omitempty"`
+	Hint  string `yaml:"hint,omitempty"` // tooltip
+}
+
+// UIFederated points the host at a Module Federation remote.
+type UIFederated struct {
+	// RemoteEntry is the URL the host imports. Typically served by
+	// the worker's own admin port, or by a static asset host.
+	RemoteEntry string `yaml:"remote_entry"`
+	// Scope is the MF "scope" name (the identifier used in Vite /
+	// Webpack federation config). Conventionally matches the tool
+	// name with dashes replaced by underscores.
+	Scope string `yaml:"scope"`
+	// Slots maps reconmesh slot names to the modules the remote
+	// exposes. Example: { "host-tab": "./HostTab" }.
+	Slots map[string]string `yaml:"slots"`
 }
 
 // ConsumeSpec describes the asset selector for a phase.
