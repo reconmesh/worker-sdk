@@ -216,7 +216,15 @@ func (rt *runtime) configLoop(ctx context.Context) {
 		rt.logger.Warn("config listen: acquire", "error", err)
 		return
 	}
-	defer conn.Release()
+	// Nil-guarded defer: when the reconnect path below releases conn
+	// and the subsequent Acquire fails (PG fully down), conn is set
+	// to nil and we return. Without the guard, the defer would call
+	// nil.Release() and panic the entire worker process on a PG flap.
+	defer func() {
+		if conn != nil {
+			conn.Release()
+		}
+	}()
 	if _, err := conn.Exec(ctx, `LISTEN tool_config_changed`); err != nil {
 		rt.logger.Warn("config listen: LISTEN", "error", err)
 		return
@@ -232,6 +240,7 @@ func (rt *runtime) configLoop(ctx context.Context) {
 			// re-LISTEN. Keeps the worker reactive across PG flaps.
 			time.Sleep(2 * time.Second)
 			conn.Release()
+			conn = nil // defer is safe even if Acquire below fails
 			conn, err = rt.pool.Acquire(ctx)
 			if err != nil {
 				return
