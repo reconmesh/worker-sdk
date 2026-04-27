@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/reconmesh/worker-sdk/sdk/mtls"
 )
 
 // DiscoveredRecord is one row tm-subfind (or any future enumeration
@@ -56,8 +58,7 @@ func PushRecords(ctx context.Context, baseURL string, records []DiscoveredRecord
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	cli := &http.Client{Timeout: 30 * time.Second}
-	resp, err := cli.Do(req)
+	resp, err := mtls.Client().Do(req)
 	if err != nil {
 		return fmt.Errorf("dns push: %w", err)
 	}
@@ -116,8 +117,7 @@ func BulkResolve(ctx context.Context, baseURL string, hosts []string, types []st
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	cli := &http.Client{Timeout: 60 * time.Second}
-	resp, err := cli.Do(req)
+	resp, err := mtls.Client().Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("bulk resolve: %w", err)
 	}
