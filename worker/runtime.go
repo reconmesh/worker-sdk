@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -146,20 +147,40 @@ func (rt *runtime) registerWorker(ctx context.Context) error {
 		return err
 	}
 	queues := phaseNames(rt.manifest)
+	// meta.admin_url lets the control plane reach our /admin/update
+	// endpoint. We compose it from os.Hostname() (= the container's
+	// in-cluster DNS name on docker-compose / k8s) plus the configured
+	// listen port. Operators who run multiple replicas behind a
+	// hostname will see one row per instance regardless of replica.
+	host, _ := os.Hostname()
+	if host == "" {
+		host = "localhost"
+	}
+	port := rt.adminAddr
+	if strings.HasPrefix(port, ":") {
+		port = port[1:]
+	}
+	meta := map[string]any{
+		"admin_url": "http://" + host + ":" + port,
+		"hostname":  host,
+	}
+	metaJSON, _ := json.Marshal(meta)
+
 	const q = `
 		INSERT INTO workers (instance, tool, version, sdk_version, queues,
-		                     manifest, started_at, last_heartbeat)
-		VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW(), NOW())
+		                     manifest, meta, started_at, last_heartbeat)
+		VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, NOW(), NOW())
 		ON CONFLICT (instance) DO UPDATE
 		   SET tool = EXCLUDED.tool,
 		       version = EXCLUDED.version,
 		       sdk_version = EXCLUDED.sdk_version,
 		       queues = EXCLUDED.queues,
 		       manifest = EXCLUDED.manifest,
+		       meta = workers.meta || EXCLUDED.meta,
 		       last_heartbeat = NOW()`
 	_, err = rt.pool.Exec(ctx, q,
 		rt.instance, rt.manifest.Tool, rt.manifest.Version, Version,
-		queues, manifestJSON,
+		queues, manifestJSON, metaJSON,
 	)
 	return err
 }
