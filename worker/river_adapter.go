@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
@@ -98,37 +97,28 @@ func (w *cascadeWorker) Work(ctx context.Context, j *river.Job[CascadeArgs]) err
 	return nil
 }
 
-// persist writes Result back. Done in two batches:
-//   - NewAssets via UpsertAsset (idempotent per identity)
-//   - AssetUpdate as a JSONB merge on the consumed asset
+// persist writes Result back. Two phases:
+//   - AssetUpdate as a JSONB merge on the consumed asset.
+//   - NewAssets via batched UPSERT (one PG round-trip per chunk of
+//     500). The trigger still fires per-row inside the statement, so
+//     each child still gets its own NOTIFY at commit and the cascade
+//     fan-out is preserved — we just stop paying N round-trips.
 //
-// We don't wrap these in a single transaction. Rationale: each Upsert
-// fires the assets_on_change trigger which produces a NOTIFY +
-// asset_events row; one transaction batching N upserts would emit
-// only one NOTIFY at COMMIT, breaking the per-asset cascade fan-out.
-// The trade-off: a partial failure mid-loop leaves SOME children
-// inserted. The cascade is idempotent (UniqueOpts dedup), so a retry
-// just re-emits the rest.
+// We don't wrap the two phases in a single transaction. The cascade
+// is idempotent (UniqueOpts dedup on River), so a partial failure
+// after MergeUpdate but before UpsertAssetsBatch is recoverable: a
+// retry re-emits the children, and the merge is a no-op if attrs
+// are unchanged.
 func (w *cascadeWorker) persist(ctx context.Context, args CascadeArgs, res Result) error {
-	// AssetUpdate: enrich the consumed asset.
 	if len(res.AssetUpdate) > 0 {
 		if err := w.writer.MergeUpdate(ctx, args.AssetID, res.AssetUpdate); err != nil {
 			return fmt.Errorf("merge update: %w", err)
 		}
 	}
-
-	// NewAssets: insert children. ParentID defaults to the consumed
-	// asset (most workers' children belong under the asset they
-	// processed) but tools can override per-asset.
-	for _, na := range res.NewAssets {
+	if len(res.NewAssets) > 0 {
 		parent := args.AssetID
-		if na.ParentID != "" {
-			if p, err := uuid.Parse(na.ParentID); err == nil {
-				parent = p
-			}
-		}
-		if err := w.writer.UpsertAsset(ctx, args.ScopeID, &parent, na); err != nil {
-			return fmt.Errorf("upsert %s/%s: %w", na.Kind, na.Value, err)
+		if err := w.writer.UpsertAssetsBatch(ctx, args.ScopeID, &parent, res.NewAssets); err != nil {
+			return fmt.Errorf("upsert batch (%d assets): %w", len(res.NewAssets), err)
 		}
 	}
 	return nil

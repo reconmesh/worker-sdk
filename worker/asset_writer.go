@@ -126,6 +126,126 @@ func (w *AssetWriter) UpsertAsset(ctx context.Context, scopeID uuid.UUID, parent
 	return err
 }
 
+// UpsertAssetsBatch writes N assets in one PG statement. Used by the
+// runtime when Result.NewAssets is large (tm-subfind routinely emits
+// hundreds of subdomains for a single wildcard).
+//
+// Why batching matters: per-asset Exec costs one PG round-trip each,
+// so 1000 NewAssets = 1000 round-trips ≈ 200 ms wall-clock on a LAN.
+// One multi-row INSERT executes in single-digit ms regardless of N.
+//
+// Trigger semantics stay correct: AFTER INSERT FOR EACH ROW fires
+// per-row inside the statement, queuing N pg_notify() calls. At
+// COMMIT, all N notifications deliver — the cascade engine sees the
+// same fan-out it would from N sequential inserts, just bursted.
+//
+// Chunking at 500 rows × 7 params/row = 3500 params per statement,
+// well below the PG 65535 parameter cap. The merge formula
+// `assets.attrs || EXCLUDED.attrs` and the fingerprint guard match
+// UpsertAsset 1:1 — same idempotence semantics.
+func (w *AssetWriter) UpsertAssetsBatch(ctx context.Context, scopeID uuid.UUID, parentID *uuid.UUID, assets []Asset) error {
+	if len(assets) == 0 {
+		return nil
+	}
+	const chunk = 500
+	for start := 0; start < len(assets); start += chunk {
+		end := start + chunk
+		if end > len(assets) {
+			end = len(assets)
+		}
+		if err := w.upsertChunk(ctx, scopeID, parentID, assets[start:end]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (w *AssetWriter) upsertChunk(ctx context.Context, scopeID uuid.UUID, parentID *uuid.UUID, assets []Asset) error {
+	// Build VALUES (...) (...) (...) with $1..$N placeholders.
+	// Args layout per row: scope_id, kind, value, parent_id, attrs, fp.
+	const argsPerRow = 6
+	args := make([]any, 0, argsPerRow*len(assets))
+	values := make([]byte, 0, 64*len(assets))
+	for i, a := range assets {
+		if a.Kind == "" || a.Value == "" {
+			return fmt.Errorf("asset[%d].{kind,value} required", i)
+		}
+		attrs := a.Attrs
+		if attrs == nil {
+			attrs = map[string]any{}
+		}
+		attrsJSON, err := json.Marshal(attrs)
+		if err != nil {
+			return err
+		}
+		fp := fingerprintAttrs(attrs)
+		// Per-asset parent override (Asset.ParentID populated from the
+		// tool); fall back to the consumed asset's id passed in.
+		var parentArg any
+		if a.ParentID != "" {
+			if pid, err := uuid.Parse(a.ParentID); err == nil {
+				parentArg = pid
+			}
+		}
+		if parentArg == nil && parentID != nil {
+			parentArg = *parentID
+		}
+		base := i * argsPerRow
+		if i > 0 {
+			values = append(values, ',')
+		}
+		values = appendValuesTuple(values, base+1)
+		args = append(args,
+			scopeID, a.Kind, a.Value, parentArg, string(attrsJSON), fp,
+		)
+	}
+	// Single query with merge-on-conflict; trigger fires per affected
+	// row, NOTIFY delivered at commit.
+	query := `INSERT INTO assets (scope_id, kind, value, parent_id, attrs, fingerprint, state)
+VALUES ` + string(values) + `
+ON CONFLICT (scope_id, kind, value) DO UPDATE
+   SET attrs       = assets.attrs || EXCLUDED.attrs,
+       fingerprint = EXCLUDED.fingerprint,
+       last_seen   = NOW()
+   WHERE assets.fingerprint IS DISTINCT FROM EXCLUDED.fingerprint
+      OR assets.last_seen   < NOW() - interval '1 minute'`
+	_, err := w.pool.Exec(ctx, query, args...)
+	return err
+}
+
+// appendValuesTuple writes "($N, $N+1, $N+2, $N+3, $N+4::jsonb, $N+5, 'discovered')"
+// into the buffer. Manual sprintf is cheap and avoids strconv.Itoa
+// churn for the hot path.
+func appendValuesTuple(buf []byte, base int) []byte {
+	buf = append(buf, '(')
+	for i := 0; i < 6; i++ {
+		if i > 0 {
+			buf = append(buf, ',')
+		}
+		buf = append(buf, '$')
+		buf = appendInt(buf, base+i)
+		if i == 4 {
+			buf = append(buf, ':', ':', 'j', 's', 'o', 'n', 'b')
+		}
+	}
+	buf = append(buf, ',', '\'', 'd', 'i', 's', 'c', 'o', 'v', 'e', 'r', 'e', 'd', '\'', ')')
+	return buf
+}
+
+func appendInt(buf []byte, n int) []byte {
+	if n < 10 {
+		return append(buf, byte('0'+n))
+	}
+	var tmp [12]byte
+	i := len(tmp)
+	for n > 0 {
+		i--
+		tmp[i] = byte('0' + n%10)
+		n /= 10
+	}
+	return append(buf, tmp[i:]...)
+}
+
 // MergeUpdate applies attrs delta to an existing asset by ID. Used
 // by phases that enrich (tm-resolve setting ip on a subdomain) — the
 // (scope, kind, value) identity is already known to be unique, so
