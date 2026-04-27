@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -57,11 +58,41 @@ type Entry struct {
 // before issuing a network fetch + Upsert on success.
 type Cache struct {
 	pool *pgxpool.Pool
-	// Stale-after threshold. Lookups returning a row older than this
-	// are treated as misses so the caller refetches. Operators tune
-	// down to tighten freshness, up to favor network economy.
-	StaleAfter time.Duration
+	mu   sync.RWMutex
+	// staleAfter — lookups returning a row older than this are
+	// treated as misses so the caller refetches. Operators tune down
+	// to tighten freshness, up to favor network economy.
+	//
+	// Read via staleAfterRead(); written via SetStaleAfter (the
+	// runtime calls it on cluster_settings_changed NOTIFY so an
+	// operator edit applies on the next Lookup).
+	staleAfter time.Duration
 }
+
+// staleAfterRead is the lock-protected accessor; Lookup uses it
+// rather than the field directly so SetStaleAfter swaps are visible
+// without races.
+func (c *Cache) staleAfterRead() time.Duration {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.staleAfter
+}
+
+// SetStaleAfter rewrites the freshness threshold. The runtime's
+// cluster_settings listener calls this so an operator edit takes
+// effect immediately rather than waiting for a worker restart.
+// Zero or negative disables the staleness check (every cached row
+// counts as fresh — useful for forensic mode).
+func (c *Cache) SetStaleAfter(d time.Duration) {
+	c.mu.Lock()
+	c.staleAfter = d
+	c.mu.Unlock()
+}
+
+// StaleAfter is the legacy field-style accessor used by external
+// code that pre-dated SetStaleAfter. Kept for back-compat; new code
+// reads via the dedicated method or stays inside the package.
+func (c *Cache) StaleAfter() time.Duration { return c.staleAfterRead() }
 
 // Per-process counters. Expose as Prom metrics via the worker-sdk
 // metrics package — incremented on every Lookup / Upsert path so
@@ -87,13 +118,79 @@ func New(ctx context.Context, dsn string) (*Cache, error) {
 	if err != nil {
 		return nil, fmt.Errorf("httpcache: pool: %w", err)
 	}
-	return &Cache{pool: pool, StaleAfter: 24 * time.Hour}, nil
+	return &Cache{pool: pool, staleAfter: 24 * time.Hour}, nil
 }
 
 // FromPool wraps an existing pgxpool. Use this when the caller
 // already has a pool open (e.g. the worker-sdk runtime's pool).
 func FromPool(pool *pgxpool.Pool) *Cache {
-	return &Cache{pool: pool, StaleAfter: 24 * time.Hour}
+	return &Cache{pool: pool, staleAfter: 24 * time.Hour}
+}
+
+// FollowClusterSettings opens a LISTEN on cluster_settings_changed
+// and updates StaleAfter from http_cache_ttl_hours whenever the
+// operator edits the cluster settings. Returns immediately; the
+// listener runs until ctx cancels.
+//
+// Workers that want their body cache freshness to track the cluster
+// admin panel call this once at boot:
+//
+//	cache, _ := httpcache.New(ctx, dsn)
+//	go cache.FollowClusterSettings(ctx)
+//
+// Best-effort: a transient PG error pauses the listener for 2s and
+// retries. The cache keeps its current StaleAfter in the meantime.
+func (c *Cache) FollowClusterSettings(ctx context.Context) {
+	// Initial read so a fresh boot picks up the current value
+	// before the first NOTIFY.
+	c.refreshStaleFromCluster(ctx)
+	for {
+		conn, err := c.pool.Acquire(ctx)
+		if err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		if _, err := conn.Exec(ctx, `LISTEN cluster_settings_changed`); err != nil {
+			conn.Release()
+			if ctx.Err() != nil {
+				return
+			}
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		for {
+			if _, err := conn.Conn().WaitForNotification(ctx); err != nil {
+				conn.Release()
+				if ctx.Err() != nil {
+					return
+				}
+				time.Sleep(2 * time.Second)
+				break
+			}
+			c.refreshStaleFromCluster(ctx)
+		}
+	}
+}
+
+func (c *Cache) refreshStaleFromCluster(ctx context.Context) {
+	rctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	var raw []byte
+	err := c.pool.QueryRow(rctx,
+		`SELECT settings FROM cluster_settings WHERE key = 'global'`).Scan(&raw)
+	if err != nil {
+		return
+	}
+	var s map[string]any
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return
+	}
+	if v, ok := s["http_cache_ttl_hours"].(float64); ok && v > 0 {
+		c.SetStaleAfter(time.Duration(v * float64(time.Hour)))
+	}
 }
 
 // Close releases the pool. Safe to call multiple times. No-op when
@@ -141,7 +238,8 @@ func (c *Cache) Lookup(ctx context.Context, rawURL string) (*Entry, error) {
 		cntLookupMiss.Inc()
 		return nil, err
 	}
-	if c.StaleAfter > 0 && time.Since(e.FetchedAt) > c.StaleAfter {
+	stale := c.staleAfterRead()
+	if stale > 0 && time.Since(e.FetchedAt) > stale {
 		cntLookupStale.Inc()
 		return nil, nil
 	}
