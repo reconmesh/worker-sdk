@@ -1,0 +1,13 @@
+# CI is delegated to the reusable workflow in reconmesh/platform.
+# This file should stay one-line so the contract is clear: "we use the
+# org's standard go-tool pipeline, nothing custom."
+
+name: ci
+on: [push, pull_request]
+
+jobs:
+  ci:
+    uses: reconmesh/platform/.github/workflows/go-tool.yml@main
+    with:
+      go_version: stable
+      coverage_threshold: 60
