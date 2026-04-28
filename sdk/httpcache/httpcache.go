@@ -143,6 +143,14 @@ func FromPool(pool *pgxpool.Pool) *Cache {
 	return &Cache{pool: pool, staleAfter: 24 * time.Hour}
 }
 
+// Pool exposes the underlying pgxpool so sister caches that share the
+// same Postgres (e.g. SourceCache for tm_extracted_sources) can attach
+// without opening a duplicate connection set. Caller MUST NOT Close()
+// this pool · ownership stays with the original Cache.
+func (c *Cache) Pool() *pgxpool.Pool {
+	return c.pool
+}
+
 // FollowClusterSettings opens a LISTEN on cluster_settings_changed
 // and updates StaleAfter from http_cache_ttl_hours whenever the
 // operator edits the cluster settings. Returns immediately; the
