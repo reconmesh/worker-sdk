@@ -34,6 +34,23 @@ type Manifest struct {
 	// owns its own config schema. Surfaced in /api/plugins so the
 	// UI can show defaults vs override.
 	Config map[string]any `yaml:"config,omitempty"`
+	// Secrets is the dotted-path list of config fields encrypted at
+	// rest (Stage I22). The controlplane API masks these as "***"
+	// in GET responses and encrypts via AES-256-GCM on PUT. The SDK
+	// runtime decrypts them on the worker side before passing the
+	// merged config to ReloadConfig — workers see plaintext API
+	// keys at scan time without ever round-tripping the plaintext
+	// through the operator UI again.
+	//
+	// Format: ["api_key", "providers.shodan_key"] — top-level keys
+	// or dotted paths (matches the secretbox field walker).
+	//
+	// Required for any encrypted field. A field that's encrypted in
+	// PG but missing from this list arrives at ReloadConfig as
+	// "enc:v1:..." ciphertext and the worker's HTTP calls fail
+	// with garbage credentials — the manifest is the source of
+	// truth on what's a secret.
+	Secrets []string `yaml:"secrets,omitempty"`
 	// Phases declares one or more pipeline phases this worker handles.
 	// A single binary can serve several phases by branching in Run on
 	// Job.Phase; this is rare in practice.

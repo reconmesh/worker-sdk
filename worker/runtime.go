@@ -19,6 +19,7 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/reconmesh/worker-sdk/sdk/metrics"
+	"github.com/reconmesh/worker-sdk/sdk/secretbox"
 
 	"gopkg.in/yaml.v3"
 )
@@ -54,6 +55,13 @@ type runtime struct {
 	// "<tool>-<random>". It lands in workers.instance and is used
 	// as the heartbeat key.
 	instance string
+
+	// secretsKey caches the result of secretbox.LoadKeyFromEnv()
+	// across config reloads so we don't re-parse the env var on
+	// every NOTIFY tool_config_changed. nil = not loaded yet (or
+	// missing env). Loaded lazily on the first applyConfig call
+	// that has manifest.Secrets non-empty.
+	secretsKey *secretbox.Key
 
 	closeOnce sync.Once
 }
@@ -150,22 +158,64 @@ func (rt *runtime) Run(ctx context.Context) error {
 }
 
 // applyConfig reads tool_configs.config for this tool, deep-merges
-// it onto the manifest's static config, and hands the result to
+// it onto the manifest's static config, decrypts manifest-declared
+// secret fields (Stage I22), and hands the result to
 // Tool.ReloadConfig. Best-effort — a transient PG error logs and
 // returns; the worker keeps running with whatever config it had.
 //
 // Merge rule (mirrors controlplane/internal/api/plugins.go):
 // override wins on key conflict; nested maps recurse; arrays /
 // scalars in override replace the manifest value wholesale.
+//
+// Decrypt rule (I22): for every dotted-path in manifest.Secrets,
+// if the merged value is "enc:v1:..." we Decrypt with
+// $RECON_SECRETS_KEY. A failed decrypt leaves the ciphertext in
+// place + logs the path — the worker's downstream HTTP call then
+// fails loudly with garbage credentials, which is the right
+// behavior (silently dropping the field would mean unauthenticated
+// calls).
 func (rt *runtime) applyConfig(ctx context.Context) error {
 	cfg, ok := rt.tool.(Configurable)
 	if !ok {
 		return nil
 	}
 	merged := rt.fetchMergedConfig(ctx)
+	rt.decryptSecrets(merged)
 	loadCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	return cfg.ReloadConfig(loadCtx, merged)
+}
+
+// decryptSecrets is the I22 worker-side close. Read the cluster
+// key once (cached on rt for subsequent reloads) and walk every
+// declared secret path.
+func (rt *runtime) decryptSecrets(merged map[string]any) {
+	if len(rt.manifest.Secrets) == 0 {
+		return
+	}
+	if rt.secretsKey == nil {
+		k, err := secretbox.LoadKeyFromEnv()
+		if err != nil {
+			rt.logger.Warn("secretbox key not loaded — secret config fields will arrive as ciphertext",
+				"tool", rt.manifest.Tool,
+				"hint", "set RECON_SECRETS_KEY to a base64-encoded 32-byte value")
+			return
+		}
+		rt.secretsKey = &k
+	}
+	dec, failed := secretbox.DecryptFields(merged, rt.manifest.Secrets, *rt.secretsKey)
+	if dec > 0 {
+		rt.logger.Info("decrypted secret config fields",
+			"tool", rt.manifest.Tool, "count", dec)
+	}
+	if len(failed) > 0 {
+		// Each failed field is left as ciphertext in merged so
+		// the downstream call fails loudly. Operator visible:
+		// the slog line tells them which field couldn't decrypt;
+		// they rotate the key or re-paste the secret in the UI.
+		rt.logger.Warn("secret decrypt failed — worker will see ciphertext for these fields",
+			"tool", rt.manifest.Tool, "fields", failed)
+	}
 }
 
 func (rt *runtime) fetchMergedConfig(ctx context.Context) map[string]any {
