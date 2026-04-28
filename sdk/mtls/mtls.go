@@ -83,16 +83,42 @@ func build() (*http.Client, error) {
 		return nil, err
 	}
 	return &http.Client{
-		Timeout: 60 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				MinVersion:   tls.VersionTLS12,
-				RootCAs:      pool,
-				Certificates: []tls.Certificate{pair},
-			},
-			MaxIdleConns:        20,
-			IdleConnTimeout:     90 * time.Second,
-			TLSHandshakeTimeout: 10 * time.Second,
-		},
+		Timeout:   60 * time.Second,
+		Transport: cleanTransport(pool, pair),
 	}, nil
+}
+
+// cleanTransport returns an http.Transport with the leak-defensive
+// defaults the cleanhttp pattern advocates (one canonical transport
+// per process, sane keep-alive + idle pool sizing, no shared global
+// state). We don't pull github.com/projectdiscovery/cleanhttp or
+// hashicorp/go-cleanhttp · the wrapper is ~30 lines around stdlib
+// defaults and adding a dep for that footprint isn't worth the
+// supply-chain weight when this is the only worker-sdk call site.
+//
+// The mTLS-specific bits (RootCAs, client cert pair, MinVersion 1.2)
+// merge with the stock cleanhttp tuning. Future call sites that
+// don't need mTLS can copy this function shape and drop the cert
+// pair without paying for the dep.
+func cleanTransport(roots *x509.CertPool, pair tls.Certificate) *http.Transport {
+	return &http.Transport{
+		// Keep-alive defaults · explicit so a future stdlib change
+		// in DefaultTransport doesn't silently shift our scanner
+		// behavior.
+		Proxy:                 http.ProxyFromEnvironment,
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   10,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		ForceAttemptHTTP2:     true,
+		// DisableKeepAlives off · we WANT keep-alive on a small pool
+		// to amortize the TLS handshake across cluster-internal calls.
+		DisableKeepAlives: false,
+		TLSClientConfig: &tls.Config{
+			MinVersion:   tls.VersionTLS12,
+			RootCAs:      roots,
+			Certificates: []tls.Certificate{pair},
+		},
+	}
 }
