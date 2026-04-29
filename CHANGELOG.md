@@ -11,6 +11,22 @@ this project follows [Semantic Versioning](https://semver.org/).
   surfaced on the controlplane Plugins page. YAML round-trip pinned by
   test (`TestLoadManifest_DescriptionRoundTrip`). Wire-additive · workers
   without a description still register cleanly.
+- `worker/jobargs_test.go` · pin tests on the JobKind wire contract
+  (sister to controlplane/internal/jobtype/jobtype_test.go). A silent
+  rename on either side makes River stop matching jobs · the pin
+  guard is now symmetric.
+
+### Tests
+- `internal/dispatcher` (notif-service) shape audit added a
+  `TestLoadManifest_DescriptionRoundTrip` pin · catches yaml-tag drift
+  on the new Description field that would silently blank the catalog.
+
+### CI
+- `release.yml` workflow added · v* tags now create a GitHub Release
+  page with auto-generated notes + a body pointing at CHANGELOG.md.
+  The library doesn't ship binaries, but consumer module-maintainers
+  bumping `require worker-sdk vX.Y.Z` can now browse releases at
+  github.com/reconmesh/worker-sdk/releases instead of scrolling git log.
 
 ### Fixed
 - `Manifest.Validate` accepted `priority_hint` 0..4; widened to 0..9.
@@ -20,6 +36,23 @@ this project follows [Semantic Versioning](https://semver.org/).
   0..4`. The cascade engine in controlplane/internal/cascade clamps
   to River's 1..4 range at job-insertion time, so 5..9 are documentary
   intent that map to River priority 4. Pin test reflects the new shape.
+
+### Docs
+- `Finding` godoc corrected · the doc claimed dedup happens via a
+  `findings.dedup_hash` column. No such table exists · findings live
+  as JSONB elements inside `assets.attrs.findings`. Same dedup outcome
+  via per-element `hash` field, but the documented model now matches
+  the storage layout. Operators writing custom analytics SQL get the
+  right shape.
+- README Layout block aligned with the actual package tree · phantoms
+  removed (`worker/filter/`, `proto/`, `internal/`); real entries
+  surfaced (`worker/jobargs.go`, `worker/river_adapter.go`,
+  `worker/once.go`, `sdk/metrics/`, `grafana/`).
+- README Documentation section trimmed to the 2 docs that actually
+  exist (IDEMPOTENCE.md + MANIFEST.md). Phantom `ASSETS.md` /
+  `FINDINGS.md` / `CONCURRENCY.md` / `OBSERVABILITY.md` references
+  dropped · godoc on the public types in `worker/` is the canonical
+  reference until the long-form docs land.
 
 ## [v0.5.3] - 2026-04-29
 
