@@ -10,21 +10,21 @@ function should add when it does something interesting.
 
 ### Free metrics
 
-The SDK registers these on the Prometheus default registry · scrape
+The SDK registers these on the Prometheus default registry. Scrape
 them via `recon-platform/deploy/prometheus.yml` (already wired):
 
-- `recon_worker_jobs_total{tool, phase, outcome}` · counter, every
+- `recon_worker_jobs_total{tool, phase, outcome}`: counter, every
   Run() invocation. `outcome` is `success` / `error` / `timeout` /
   `circuit_open`.
-- `recon_worker_run_duration_seconds{tool, phase}` · histogram, Run()
+- `recon_worker_run_duration_seconds{tool, phase}`: histogram, Run()
   wall-clock duration.
-- `recon_worker_assets_emitted_total{tool, phase, kind}` · counter,
+- `recon_worker_assets_emitted_total{tool, phase, kind}`: counter,
   one per `Result.NewAssets[i]`.
-- `recon_worker_findings_emitted_total{tool, phase, kind, severity}`
-  · counter, one per `Result.Findings[i]`.
-- `recon_worker_dns_lookups_total{tool, outcome}` · counter, the
+- `recon_worker_findings_emitted_total{tool, phase, kind, severity}`:
+  counter, one per `Result.Findings[i]`.
+- `recon_worker_dns_lookups_total{tool, outcome}`: counter, the
   shared `sdk/dns` package increments this when used.
-- `recon_worker_http_requests_total{tool, status_class}` · counter,
+- `recon_worker_http_requests_total{tool, status_class}`: counter,
   the shared `sdk/httpcache` increments this on every fetch (cache
   hit and miss both counted separately via `outcome`).
 
@@ -76,8 +76,8 @@ func init() {
 }
 ```
 
-Cardinality budget · keep label values < 100 distinct. Don't label
-by host, asset_id, URL · those explode the cardinality.
+Cardinality budget: keep label values < 100 distinct. Don't label
+by host, asset_id, URL; those explode the cardinality.
 
 ### Structured log lines
 
@@ -93,17 +93,17 @@ slog.InfoContext(ctx, "starting NVD live lookup",
     "cve", cveID, "api", "nvd")
 ```
 
-`info` level by default · raise to `debug` for verbose internals.
+`info` level by default; raise to `debug` for verbose internals.
 `warn` for soft failures (rate limit, parse error on bad input).
 `error` for failures the operator should see.
 
 ### What NOT to log
 
-- Secrets · API keys, tokens, passwords. The runtime's slog handler
+- Secrets: API keys, tokens, passwords. The runtime's slog handler
   doesn't redact for you.
-- Full HTTP bodies · they go in `tm_http_bodies` cache, log a hash
+- Full HTTP bodies: they go in `tm_http_bodies` cache, log a hash
   reference instead.
-- Per-byte loop progress · drown signal. Log start/end + summary stats.
+- Per-byte loop progress: drowns signal. Log start/end + summary stats.
 
 ## Dashboards
 
@@ -116,5 +116,5 @@ auto-imports on `make up-stats`. Shows:
 - Finding counts by severity
 - River queue depth per phase
 
-Adding a new panel · edit the JSON in-tree, restart `grafana` container,
+Adding a new panel: edit the JSON in-tree, restart `grafana` container,
 provisioning re-imports.

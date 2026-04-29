@@ -33,6 +33,27 @@ type Manifest struct {
 	// drilling into the manifest. Keep it short (one sentence, ~80
 	// chars) so it fits the card layout.
 	Description string `yaml:"description,omitempty"`
+	// DefaultEnabled controls whether the cascade engine auto-enqueues
+	// jobs for this worker's phases without an explicit per-scope opt-in.
+	//
+	// true  (default for backwards compat): the worker runs whenever
+	//       its phase is in scope.phases and a matching asset shows
+	//       up · the historical behavior.
+	// false: the worker is "manual-only" · the cascade engine SKIPS
+	//       the enqueue unless scope.config["<tool>.enabled"] is
+	//       explicitly true OR the dispatch is a manual rescan
+	//       (force_fresh / force_run carries through and bypasses
+	//       the gate).
+	//
+	// Intended for sensitive modules: paid APIs (Shodan, VirusTotal,
+	// etc), ban-risk scrapers (Google dorking), and high-throughput
+	// scanners (masscan) where the operator wants explicit consent
+	// per scope rather than fire-and-forget cascades.
+	//
+	// We use a *bool so a missing field in YAML lands as nil (back-
+	// compat = true), an explicit `false` lands as &false. Validate()
+	// fills the default.
+	DefaultEnabled *bool `yaml:"default_enabled,omitempty"`
 	// Config is the static defaults the tool ships with. Operator
 	// overrides land in PG (tool_configs) and the SDK runtime
 	// deep-merges override over Config before invoking
@@ -282,6 +303,16 @@ type ExternalListSpec struct {
 	RefreshIntervalSeconds int `yaml:"refresh_interval_seconds,omitempty"`
 }
 
+// IsDefaultEnabled reports the effective default_enabled value with
+// the backcompat default (true) applied. Safe to call on a Manifest
+// that hasn't been Validate()'d.
+func (m *Manifest) IsDefaultEnabled() bool {
+	if m.DefaultEnabled == nil {
+		return true
+	}
+	return *m.DefaultEnabled
+}
+
 // LoadManifest reads + validates a manifest from path. The standard
 // boot path is LoadManifest("manifest.yaml") next to the binary; the
 // SDK's Serve() does this for you.
@@ -315,6 +346,14 @@ func (m *Manifest) Validate() error {
 	}
 	if m.Version == "" {
 		return errors.New("version: required")
+	}
+	// Backwards compat: a manifest that doesn't declare default_enabled
+	// is treated as "auto" (true). New gated modules MUST set false
+	// explicitly. We materialize the default here so downstream readers
+	// (cascade engine, UI) don't need to special-case the missing case.
+	if m.DefaultEnabled == nil {
+		t := true
+		m.DefaultEnabled = &t
 	}
 	if len(m.Phases) == 0 {
 		return errors.New("phases: at least one required")

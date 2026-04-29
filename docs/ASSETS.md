@@ -22,68 +22,69 @@ A new kind is rare. If your worker emits one:
 1. Pick a stable lowercase identifier matching `nameRe`
    (`^[a-z][a-z0-9]*([-_][a-z0-9]+)*$`).
 2. Document it here in the table above before merging.
-3. Other workers' `consumes.kinds` must explicitly list it · the
+3. Other workers' `consumes.kinds` must explicitly list it. The
    cascade routes by exact-match.
 
 ## Attrs
 
-`Asset.Attrs` is `map[string]any` · kind-specific metadata. Free-form
-on purpose · each worker contributes the keys it cares about, the
+`Asset.Attrs` is `map[string]any`: kind-specific metadata. Free-form
+on purpose: each worker contributes the keys it cares about, the
 cascade filter language reads them server-side.
 
 ### Common attrs by kind
 
 #### `subdomain` / `host`
 
-- `ip` (string) · primary A record · `tm-resolve` writes
-- `ipv6` (string) · primary AAAA · `tm-resolve` writes
-- `cname` (string) · canonical alias if any · `tm-resolve` writes
-- `asn` (int) · `tm-resolve` writes via asnmap inline
-- `asn_org` (string) · org name · `tm-resolve` writes
-- `cdn` (string) · cloudfront / cloudflare / fastly / akamai / … ·
-  populated by techmapper-worker via cdncheck of cached records
+- `ip` (string): primary A record. `tm-resolve` writes.
+- `ipv6` (string): primary AAAA. `tm-resolve` writes.
+- `cname` (string): canonical alias if any. `tm-resolve` writes.
+- `asn` (int): `tm-resolve` writes via asnmap inline.
+- `asn_org` (string): org name. `tm-resolve` writes.
+- `cdn` (string): cloudfront / cloudflare / fastly / akamai / …
+  populated by techmapper-worker via cdncheck of cached records.
 
 #### `port`
 
-- `tcp_port` (int) · the port number · `tm-portscan` / `tm-masscan` write
-- `host` (string) · parent host's value (denormalized for fast filter)
-- `ip` (string) · parent host's IP (denormalized)
-- `tls` (bool) · TLS detected on connect · `tm-portscan` writes
+- `tcp_port` (int): the port number. `tm-portscan` / `tm-masscan` write.
+- `host` (string): parent host's value (denormalized for fast filter).
+- `ip` (string): parent host's IP (denormalized).
+- `tls` (bool): TLS detected on connect. `tm-portscan` writes.
 - `tls.cert_fingerprint` / `tls.ja3` / `tls.sans` / `tls.expiry` /
-  `tls.issuer` · `tm-tlsx` writes when running
+  `tls.issuer`: `tm-tlsx` writes when running.
 
 #### `url`
 
-- `host` (string) · denormalized for filter
-- `tcp_port` (int) · denormalized
-- `status_code` (int) · last fetch · `tm-httpx` writes
-- `title` (string) · `<title>` from HTML body · `tm-httpx` writes
-- `content_type` (string) · `tm-httpx` writes
-- `content_length` (int) · `tm-httpx` writes
-- `body_sha256` (string) · canonical hash for body cache lookup
-- `technologies` ([]map) · wapp matches · `techmapper-worker` writes
-- `findings` ([]map) · per-element finding objects · see FINDINGS.md
-- `redirect_chain` ([]map) · `tm-httpx` writes
+- `host` (string): denormalized for filter.
+- `tcp_port` (int): denormalized.
+- `status_code` (int): last fetch. `tm-httpx` writes.
+- `title` (string): `<title>` from HTML body. `tm-httpx` writes.
+- `content_type` (string): `tm-httpx` writes.
+- `content_length` (int): `tm-httpx` writes.
+- `body_sha256` (string): canonical hash for body cache lookup.
+- `technologies` ([]map): wapp matches. `techmapper-worker` writes.
+- `findings` ([]map): per-element finding objects. See FINDINGS.md.
+- `redirect_chain` ([]map): `tm-httpx` writes.
 
 ### Filter language gotchas
 
 The cascade filter (`consumes.filter`) reads attrs server-side via
-PG JSONB operators · grammar lives in `controlplane/internal/cascade`.
-Keep keys flat or one level deep · `attrs.tls.ja3` works, `attrs.foo.bar.baz`
-gets brittle on the parser side.
+PG JSONB operators. The grammar lives in
+`controlplane/internal/cascade`. Keep keys flat or one level deep:
+`attrs.tls.ja3` works, `attrs.foo.bar.baz` gets brittle on the
+parser side.
 
 JSONB round-trips in PG can stringify numbers (`attrs.tcp_port` may
 arrive as either `443` or `"443"` depending on path). Workers reading
-attrs in Go should tolerate both shapes · see `tm-httpx`'s `numAttr`
+attrs in Go should tolerate both shapes. See `tm-httpx`'s `numAttr`
 helper for the canonical pattern (int / int64 / float64 / string-of-int
 type-switch fallback).
 
 ## Identity & dedup
 
 - An asset is uniquely keyed by `(scope_id, kind, value)`.
-- `value` is canonicalized at write time · lowercase host, normalized
+- `value` is canonicalized at write time: lowercase host, normalized
   URL, no trailing dot. The runtime in `worker/asset_writer.go` does
   this before INSERT so re-discovery collapses on the same row.
-- `value` for wildcard SANs (`*.example.com`) is preserved as-is ·
-  the subdomain space avoids them via `normalizeHost` returning empty
+- `value` for wildcard SANs (`*.example.com`) is preserved as-is.
+  The subdomain space avoids them via `normalizeHost` returning empty
   on `*.` prefix (see `tm-ip2vhost`).

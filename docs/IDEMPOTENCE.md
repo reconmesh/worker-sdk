@@ -83,8 +83,8 @@ Don't, unless you know what you're doing. The SDK commits the
 `Result` transactionally; arbitrary writes outside that transaction
 can leave the DB in an inconsistent state on a crash between your
 write and the SDK's. If you really need direct PG access, do it
-inside the SDK's PG connection (exposed via `Job.Tx` in stage-two
-runtime) so you share the transaction.
+inside the SDK's PG connection (exposed via `Job.Tx`) so you share
+the transaction.
 
 ### …shells out to a subprocess
 

@@ -6,14 +6,14 @@ plumbing every worker would otherwise re-implement: River subscription,
 Postgres pool, OpenTelemetry tracing, Prometheus metrics, finding
 deduplication, graceful shutdown.
 
-The SDK's surface is intentionally tiny - three interfaces, a handful of
+The SDK's surface is intentionally tiny: three interfaces, a handful of
 types, one `Serve` entry point. New tools implement `Tool.Run` and call
 `worker.Serve(t)`. That's it. Everything else is hidden.
 
 ## Versioning
 
 `worker-sdk` is the wire contract. Breaking changes cost ~one PR per
-worker, so we treat them carefully:
+worker, so they are handled carefully:
 
 - MINOR / PATCH bumps preserve full backward compatibility.
 - MAJOR bumps go through a deprecation cycle of at least one MINOR before
@@ -27,30 +27,30 @@ See `../platform/docs/VERSIONING.md` for the org-wide policy.
 
 ```
 worker-sdk/
-├── worker/             # the public package; what `import` consumers use
-│   ├── tool.go         # Tool interface, Job, Result, Finding, Asset
-│   ├── manifest.go     # YAML manifest schema + load/validate (incl. Description)
-│   ├── jobargs.go      # CascadeArgs wire contract (matches controlplane/jobtype)
-│   ├── serve.go        # Serve() entry point: River + signal handling
-│   ├── runtime.go      # PG pool, metrics, OTel, config reload
-│   ├── river_adapter.go# River JobArgs binding + worker registration
-│ ├── asset_writer.go # UpsertAsset + sync.Pool fingerprint (G1, -27% bytes/op)
-│   ├── dedup.go        # finding hash canonicalization
-│   └── once.go         # --once / --asset synthetic-job mode (no DB, no River)
-├── sdk/                # opt-in helpers · workers import only what they need
-│ ├── mtls/ # cleanhttp-style http.Client with mTLS roots
-│ ├── httpcache/ # cluster body cache + SourceCache
-│   ├── dns/            # dns-service HTTP client wrapper + local fallback
-│   ├── secretbox/      # I22 AES-256-GCM decrypt (read-only by design)
-│   ├── metrics/        # shared prometheus collectors for the worker side
-│   └── tracing/        # OTLP exporter helpers
-├── docs/               # ASSETS / FINDINGS / IDEMPOTENCE / CONCURRENCY / MANIFEST
-├── grafana/            # ready-to-import dashboards for worker-side metrics
+├── worker/                # the public package; what `import` consumers use
+│   ├── tool.go            # Tool interface, Job, Result, Finding, Asset
+│   ├── manifest.go        # YAML manifest schema + load/validate (incl. Description)
+│   ├── jobargs.go         # CascadeArgs wire contract (matches controlplane/jobtype)
+│   ├── serve.go           # Serve() entry point: River + signal handling
+│   ├── runtime.go         # PG pool, metrics, OTel, config reload
+│   ├── river_adapter.go   # River JobArgs binding + worker registration
+│   ├── asset_writer.go    # UpsertAsset + sync.Pool fingerprint
+│   ├── dedup.go           # finding hash canonicalization
+│   └── once.go            # --once / --asset synthetic-job mode (no DB, no River)
+├── sdk/                   # opt-in helpers; workers import only what they need
+│   ├── mtls/              # cleanhttp-style http.Client with mTLS roots
+│   ├── httpcache/         # cluster body cache + SourceCache
+│   ├── dns/               # dns-service HTTP client wrapper + local fallback
+│   ├── secretbox/         # AES-256-GCM decrypt (read-only by design)
+│   ├── metrics/           # shared prometheus collectors for the worker side
+│   └── tracing/           # OTLP exporter helpers
+├── docs/                  # ASSETS / FINDINGS / IDEMPOTENCE / CONCURRENCY / MANIFEST
+├── grafana/               # ready-to-import dashboards for worker-side metrics
 └── CHANGELOG.md
 ```
 
 The `consumes.filter` DSL is parsed inside the controlplane (cascade
-engine), not the SDK · workers receive jobs that already match the
+engine), not the SDK. Workers receive jobs that already match the
 filter. The SDK only ships the *manifest* type that declares it.
 
 ## Quick example
