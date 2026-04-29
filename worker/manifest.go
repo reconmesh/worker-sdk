@@ -15,7 +15,7 @@ import (
 // manifest fails the worker process before it serves a single job.
 //
 // The on-disk shape mirrors this struct 1:1. We use yaml v3 tags rather
-// than json so manifests can carry comments — they're operator-facing,
+// than json so manifests can carry comments - they're operator-facing,
 // not just machine-read.
 type Manifest struct {
 	// Tool is the canonical worker name. Must match the value
@@ -36,7 +36,7 @@ type Manifest struct {
 	// Config is the static defaults the tool ships with. Operator
 	// overrides land in PG (tool_configs) and the SDK runtime
 	// deep-merges override over Config before invoking
-	// Configurable.ReloadConfig. Free-form on purpose — each tool
+	// Configurable.ReloadConfig. Free-form on purpose - each tool
 	// owns its own config schema. Surfaced in /api/plugins so the
 	// UI can show defaults vs override.
 	Config map[string]any `yaml:"config,omitempty"`
@@ -44,17 +44,17 @@ type Manifest struct {
 	// rest (Stage I22). The controlplane API masks these as "***"
 	// in GET responses and encrypts via AES-256-GCM on PUT. The SDK
 	// runtime decrypts them on the worker side before passing the
-	// merged config to ReloadConfig — workers see plaintext API
+	// merged config to ReloadConfig - workers see plaintext API
 	// keys at scan time without ever round-tripping the plaintext
 	// through the operator UI again.
 	//
-	// Format: ["api_key", "providers.shodan_key"] — top-level keys
+	// Format: ["api_key", "providers.shodan_key"] - top-level keys
 	// or dotted paths (matches the secretbox field walker).
 	//
 	// Required for any encrypted field. A field that's encrypted in
 	// PG but missing from this list arrives at ReloadConfig as
 	// "enc:v1:..." ciphertext and the worker's HTTP calls fail
-	// with garbage credentials — the manifest is the source of
+	// with garbage credentials - the manifest is the source of
 	// truth on what's a secret.
 	Secrets []string `yaml:"secrets,omitempty"`
 	// Phases declares one or more pipeline phases this worker handles.
@@ -72,7 +72,7 @@ type Phase struct {
 	Name string `yaml:"name"`
 	// Consumes declares which assets feed this phase.
 	Consumes ConsumeSpec `yaml:"consumes"`
-	// Produces is documentary — it doesn't restrict what Run can
+	// Produces is documentary - it doesn't restrict what Run can
 	// emit, but the control plane's "expected outputs" UI uses it
 	// to show operators what a phase is meant to do.
 	Produces ProduceSpec `yaml:"produces"`
@@ -81,7 +81,7 @@ type Phase struct {
 	// that don't hit a network endpoint).
 	ConcurrencyPerHost int `yaml:"concurrency_per_host,omitempty"`
 	// AvgDurationMS is a hint used by the control plane's capacity
-	// planner to size queues and warn on backlogs. It's a hint only —
+	// planner to size queues and warn on backlogs. It's a hint only -
 	// not enforced.
 	AvgDurationMS int `yaml:"avg_duration_ms,omitempty"`
 	// TimeoutSeconds caps a single Run invocation. 0 means use the
@@ -99,7 +99,7 @@ type Phase struct {
 	// observations. Two modes:
 	//
 	//   - declarative: a tab + view spec the front renders generically
-	//     (table of attrs, key-value list, markdown). Default — most
+	//     (table of attrs, key-value list, markdown). Default - most
 	//     plugins need nothing more.
 	//   - federated:  a Module Federation remote entry URL the front
 	//     loads at runtime. The remote can render arbitrary React
@@ -258,13 +258,13 @@ func LoadManifest(path string) (*Manifest, error) {
 }
 
 // nameRe matches the snake_case-or-kebab-case identifiers we accept
-// for tool, phase, and kind names. Conservative on purpose — too lax
+// for tool, phase, and kind names. Conservative on purpose - too lax
 // and we end up with `My Tool 2!` showing up in metrics labels.
 var nameRe = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$`)
 
-// Validate runs basic structural checks. It's not exhaustive — the
+// Validate runs basic structural checks. It's not exhaustive - the
 // filter grammar parser does deeper validation when filters are
-// loaded — but catches the common boot-time mistakes (typo'd phase
+// loaded - but catches the common boot-time mistakes (typo'd phase
 // name, missing version, conflicting priorities).
 func (m *Manifest) Validate() error {
 	if !nameRe.MatchString(m.Tool) {

@@ -15,7 +15,7 @@ import (
 //   - the HTTP backend can't reach the dns-service (graceful fallback)
 //   - unit tests want a real resolver without mocking gRPC
 //
-// It does NOT cache by itself — callers wrap it with cachingResolver
+// It does NOT cache by itself - callers wrap it with cachingResolver
 // if they want LRU. The default constructor (Default(), New()) does
 // that wrapping for you.
 type LocalBackend struct {
@@ -44,7 +44,7 @@ func (b *LocalBackend) lookupCtx(ctx context.Context) (context.Context, context.
 }
 
 // Resolve issues an A + AAAA query in parallel via the stdlib resolver.
-// Stdlib does this internally on LookupIP — we route through that and
+// Stdlib does this internally on LookupIP - we route through that and
 // preserve the error → typed error mapping the rest of the package
 // expects.
 func (b *LocalBackend) Resolve(ctx context.Context, host string) ([]net.IP, error) {
@@ -60,7 +60,7 @@ func (b *LocalBackend) Resolve(ctx context.Context, host string) ([]net.IP, erro
 // ResolveAll fans out the relevant per-type lookups in parallel. Stdlib
 // has no single "give me everything" call; we run five goroutines.
 // Errors per type are folded into empty fields rather than aborting
-// the whole call — partial answers are useful (e.g. an MX-only host).
+// the whole call - partial answers are useful (e.g. an MX-only host).
 func (b *LocalBackend) ResolveAll(ctx context.Context, host string) (*Records, error) {
 	ctx, cancel := b.lookupCtx(ctx)
 	defer cancel()
@@ -133,7 +133,7 @@ func (b *LocalBackend) ResolveAll(ctx context.Context, host string) (*Records, e
 		}},
 	}
 
-	// Run sequentially first — stdlib lookups are I/O bound but the
+	// Run sequentially first - stdlib lookups are I/O bound but the
 	// system resolver is shared, parallel calls don't typically
 	// speed things up linearly. If profiling later shows it matters,
 	// switch to errgroup; for now we keep things readable.

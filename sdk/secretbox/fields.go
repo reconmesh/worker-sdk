@@ -13,7 +13,7 @@ import "strings"
 // Worker semantics: a failed decrypt leaves the original
 // "enc:v1:..." string in cfg. The downstream Configurable.Reload
 // sees ciphertext for that field; the worker's HTTP call with a
-// garbage credential then fails loudly. That's intentional —
+// garbage credential then fails loudly. That's intentional -
 // silently dropping the field would mean the worker runs WITHOUT
 // authentication when the key is wrong, which is worse than a
 // noisy auth failure.
@@ -50,7 +50,7 @@ func DecryptFields(cfg map[string]any, secretFields []string, k Key) (decrypted 
 
 // splitPath turns "providers.shodan_key" into ["providers",
 // "shodan_key"]. Edge cases (leading dot, double dot, trailing
-// dot) are tolerated — operator typos drop the empty segments.
+// dot) are tolerated - operator typos drop the empty segments.
 func splitPath(path string) []string {
 	path = strings.TrimSpace(path)
 	if path == "" {
@@ -88,7 +88,7 @@ func walkValue(m map[string]any, segments []string) (any, bool) {
 }
 
 // setValue descends segments and sets the leaf to v. No-op when an
-// intermediate segment doesn't exist or isn't a map — we don't
+// intermediate segment doesn't exist or isn't a map - we don't
 // auto-create the path because that would let a typo'd secret
 // field grow the operator's config silently.
 func setValue(m map[string]any, segments []string, v any) {

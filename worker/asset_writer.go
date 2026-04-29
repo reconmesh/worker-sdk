@@ -42,7 +42,7 @@ type AssetWriter struct {
 func NewAssetWriter(pool *pgxpool.Pool) *AssetWriter { return &AssetWriter{pool: pool} }
 
 // FetchAsset loads the row the cascade told us to act on. Workers
-// rarely do this directly — the runtime calls it before invoking
+// rarely do this directly - the runtime calls it before invoking
 // Tool.Run so the Job carries fresh attrs. Exposed so tools that
 // need to re-read mid-Run (e.g. follow a parent_id chain) don't
 // reinvent the SELECT.
@@ -73,7 +73,7 @@ func (w *AssetWriter) FetchAsset(ctx context.Context, id uuid.UUID) (*Asset, err
 }
 
 // UpsertAsset writes one asset (typically Result.NewAssets[i]) into
-// the graph. Idempotent — repeated calls with identical attrs are a
+// the graph. Idempotent - repeated calls with identical attrs are a
 // no-op (the trigger sees fingerprint unchanged and skips emitting
 // asset_events). Sets state = 'discovered' on insert; the worker may
 // override via attrs.state.
@@ -118,13 +118,13 @@ func (w *AssetWriter) UpsertAsset(ctx context.Context, scopeID uuid.UUID, parent
 	//
 	// The fingerprint we write is the hash of OUR partial attrs; after
 	// merge the row's actual attrs may differ from what we hashed.
-	// The trigger compares (old fingerprint, new fingerprint) — if
+	// The trigger compares (old fingerprint, new fingerprint) - if
 	// they differ, it emits asset_events. Acceptable: a partial update
 	// from us is still a real change worth recording.
 	//
 	// Earlier revisions called fingerprintAttrs twice (once for fp,
 	// once for "mergedFP") and bound them to two different placeholders
-	// — the values were always identical so the second sha256 was
+	// - the values were always identical so the second sha256 was
 	// pure waste. Now reuse $6 in both INSERT and UPDATE.
 	_, err = w.pool.Exec(ctx, q,
 		scopeID, a.Kind, a.Value, parentArg, string(attrsJSON), fp,
@@ -142,13 +142,13 @@ func (w *AssetWriter) UpsertAsset(ctx context.Context, scopeID uuid.UUID, parent
 //
 // Trigger semantics stay correct: AFTER INSERT FOR EACH ROW fires
 // per-row inside the statement, queuing N pg_notify() calls. At
-// COMMIT, all N notifications deliver — the cascade engine sees the
+// COMMIT, all N notifications deliver - the cascade engine sees the
 // same fan-out it would from N sequential inserts, just bursted.
 //
 // Chunking at 500 rows × 7 params/row = 3500 params per statement,
 // well below the PG 65535 parameter cap. The merge formula
 // `assets.attrs || EXCLUDED.attrs` and the fingerprint guard match
-// UpsertAsset 1:1 — same idempotence semantics.
+// UpsertAsset 1:1 - same idempotence semantics.
 func (w *AssetWriter) UpsertAssetsBatch(ctx context.Context, scopeID uuid.UUID, parentID *uuid.UUID, assets []Asset) error {
 	if len(assets) == 0 {
 		return nil
@@ -253,7 +253,7 @@ func appendInt(buf []byte, n int) []byte {
 }
 
 // MergeUpdate applies attrs delta to an existing asset by ID. Used
-// by phases that enrich (tm-resolve setting ip on a subdomain) — the
+// by phases that enrich (tm-resolve setting ip on a subdomain) - the
 // (scope, kind, value) identity is already known to be unique, so
 // we don't reroute through UpsertAsset.
 //
@@ -345,7 +345,7 @@ var bufferPool = sync.Pool{
 
 // canonicalizeForHash sorts map keys recursively. Slices keep their
 // order (a worker that emits results in a specific order makes that
-// order semantically meaningful — for fingerprint purposes we treat
+// order semantically meaningful - for fingerprint purposes we treat
 // reordering as a real change). Other types pass through.
 func canonicalizeForHash(v any) any {
 	switch t := v.(type) {

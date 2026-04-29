@@ -9,7 +9,7 @@
 // Configurable.ReloadConfig.
 //
 // The encrypt path lives in controlplane/internal/secretbox; we
-// don't ship it here. Workers MUST NOT encrypt — that's the
+// don't ship it here. Workers MUST NOT encrypt - that's the
 // operator's UI flow only. Read-only on the worker side keeps
 // the blast radius bounded: a compromised worker leaks secrets
 // for the keys it holds, but can't poison the config column with
@@ -41,7 +41,7 @@ const (
 )
 
 // ErrInvalid is returned for any tampering / wrong-key / corrupt
-// ciphertext. We don't distinguish the cause — constant-time
+// ciphertext. We don't distinguish the cause - constant-time
 // discipline + leaking less to a probe-attacker.
 var ErrInvalid = errors.New("secretbox: ciphertext invalid or wrong key")
 

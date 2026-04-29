@@ -80,7 +80,7 @@ func (r *cachingResolver) ResolveAll(ctx context.Context, host string) (*Records
 	r.mu.Unlock()
 	v, err := r.inner.ResolveAll(ctx, host)
 	if err == nil {
-		// Honor upstream's ValidUntil when set — it carries TTL info
+		// Honor upstream's ValidUntil when set - it carries TTL info
 		// from dns-service. Default to our own TTL otherwise.
 		ttl := r.ttl
 		if !v.ValidUntil.IsZero() {
@@ -162,7 +162,7 @@ func (r *cachingResolver) LookupNS(ctx context.Context, host string) ([]string, 
 // ----------------------------------------------------------- generic LRU --
 //
 // Tiny generic LRU. Doubly-linked list with values pinned in a map.
-// Not thread-safe on its own — the cachingResolver holds the mutex
+// Not thread-safe on its own - the cachingResolver holds the mutex
 // for the per-method maps to avoid map-key boxing across types.
 //
 // We don't pull in an external LRU library because we need TTL

@@ -13,7 +13,7 @@ import (
 
 // DiscoveredRecord is one row tm-subfind (or any future enumeration
 // worker) wants to push into the dns-service cache. Mirrors the
-// JSON shape accepted by `POST /v1/records/bulk` — see
+// JSON shape accepted by `POST /v1/records/bulk` - see
 // dns-service/internal/server/server.go::handleBulkUpsert.
 type DiscoveredRecord struct {
 	Host       string    `json:"host"`
@@ -38,7 +38,7 @@ type DiscoveredRecord struct {
 //
 // On transport failure we return the error rather than swallow it
 // so the worker can surface it in its run stats. The data isn't
-// lost forever — the records will be re-discovered on the next
+// lost forever - the records will be re-discovered on the next
 // scope run.
 func PushRecords(ctx context.Context, baseURL string, records []DiscoveredRecord) error {
 	if len(records) == 0 {
@@ -94,7 +94,7 @@ type BulkResolution struct {
 // Bulk lookup (caller uses the returned slice): pass the explicit
 // types you need ("A", "AAAA", "CNAME") to avoid populating extras.
 //
-// Hard cap of 10000 hosts per request — chunk before calling on
+// Hard cap of 10000 hosts per request - chunk before calling on
 // larger workloads.
 func BulkResolve(ctx context.Context, baseURL string, hosts []string, types []string) ([]BulkResolution, error) {
 	if len(hosts) == 0 {

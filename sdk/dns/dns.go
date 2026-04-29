@@ -40,7 +40,7 @@ type Records struct {
 	Degraded    bool      `json:"degraded,omitempty"`
 	// QueriedAt is when the upstream actually answered. For cache
 	// hits in the worker-side LRU, this stays the upstream's
-	// timestamp — not the moment we returned from cache.
+	// timestamp - not the moment we returned from cache.
 	QueriedAt   time.Time `json:"queried_at"`
 	// ValidUntil reflects the upstream TTL clipped by service caps.
 	// Callers shouldn't trust answers past this; the lib enforces it
@@ -55,7 +55,7 @@ type MX struct {
 }
 
 // IPs returns A + AAAA flattened. Order is A first (IPv4) then AAAA
-// (IPv6) — matches what most callers want when they do TCP dial with
+// (IPv6) - matches what most callers want when they do TCP dial with
 // dual-stack fallback.
 func (r *Records) IPs() []string {
 	out := make([]string, 0, len(r.A)+len(r.AAAA))

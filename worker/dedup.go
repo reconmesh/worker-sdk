@@ -8,9 +8,9 @@ import (
 )
 
 // DedupHash computes the canonical hash used to deduplicate findings
-// across runs. The same logical finding emitted twice — even with
+// across runs. The same logical finding emitted twice - even with
 // re-ordered map keys, different float representations, or unrelated
-// extra fields the worker added later — produces the same hash.
+// extra fields the worker added later - produces the same hash.
 //
 // Hash inputs (ordered):
 //   1. f.Kind     (string)
@@ -24,7 +24,7 @@ import (
 // rather than reflection-based hashing because Go's encoding/json
 // produces a deterministic byte sequence given sorted keys, and
 // canonicalizing JSON is the well-trodden path for "stable hash of a
-// JSON document". The cost is one allocation per finding — fine on a
+// JSON document". The cost is one allocation per finding - fine on a
 // hot path that's already doing PG inserts.
 func DedupHash(f Finding) []byte {
 	h := sha256.New()
@@ -56,7 +56,7 @@ func canonicalJSON(v map[string]any) []byte {
 	if err != nil {
 		// Marshal of a sorted map[string]any can't fail in practice;
 		// if it does, we surface a stable sentinel rather than panic
-		// — the SDK's caller is in a hot path.
+		// - the SDK's caller is in a hot path.
 		return []byte(`{"__canonical_error__":"true"}`)
 	}
 	return out

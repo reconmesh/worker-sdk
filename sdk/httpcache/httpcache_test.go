@@ -7,7 +7,7 @@ import (
 
 // canonicalize is the linchpin of cross-worker hits: tm-httpx writes
 // "https://example.com/" and techmapper-worker looks up
-// "https://example.com" — both must produce the same hash. These
+// "https://example.com" - both must produce the same hash. These
 // tests lock the canonicalization rules so a future refactor doesn't
 // silently break cross-worker cache sharing.
 func TestCanonicalize(t *testing.T) {
@@ -28,12 +28,12 @@ func TestCanonicalize(t *testing.T) {
 		{"https://example.com/page#section", "https://example.com/page"},
 		// Path preserved verbatim (caller normalizes if needed).
 		{"https://example.com/a/b/c", "https://example.com/a/b/c"},
-		// Query preserved verbatim — different queries are different
+		// Query preserved verbatim - different queries are different
 		// resources.
 		{"https://example.com/search?q=1", "https://example.com/search?q=1"},
 		// Empty input doesn't round-trip through the cache anyway;
 		// the function still produces SOMETHING urlHash can hash so
-		// no path crashes. We don't assert the exact value — just
+		// no path crashes. We don't assert the exact value - just
 		// that it's stable across calls (covered by TestURLHashStable).
 		// Whitespace trimmed.
 		{"  https://example.com/  ", "https://example.com/"},
@@ -53,7 +53,7 @@ func TestURLHashStable(t *testing.T) {
 	if string(a) != string(b) {
 		t.Fatal("urlHash not deterministic")
 	}
-	// And it's a real SHA-256 — 32 bytes.
+	// And it's a real SHA-256 - 32 bytes.
 	if len(a) != sha256.Size {
 		t.Fatalf("expected %d bytes, got %d", sha256.Size, len(a))
 	}

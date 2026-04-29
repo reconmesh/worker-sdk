@@ -6,7 +6,7 @@ import (
 )
 
 // TestAppendValuesTuple confirms the manual SQL fragment builder
-// emits valid placeholders. We don't go through PG here — that lives
+// emits valid placeholders. We don't go through PG here - that lives
 // in the integration test suite. This test guards against off-by-one
 // bugs in appendInt / appendValuesTuple, which would silently corrupt
 // the batched UPSERT statement at scale.

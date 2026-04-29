@@ -7,7 +7,7 @@ import (
 )
 
 // TestMain wires goleak (Stage A5). httpcache is the body-cache layer
-// — Upsert + Lookup are synchronous PG calls, no goroutines. The
+// - Upsert + Lookup are synchronous PG calls, no goroutines. The
 // tripwire is here so a future fetch-pool / async-fan-out can't silently
 // regress.
 func TestMain(m *testing.M) {

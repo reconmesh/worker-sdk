@@ -8,7 +8,7 @@ import (
 
 // Options configures New(). Every field is optional; defaults are
 // chosen so a typical worker calls New(Options{}) and gets a
-// resolver that goes through the system /etc/resolv.conf — which in
+// resolver that goes through the system /etc/resolv.conf - which in
 // production points at dns-service:53 via the docker-compose `dns:`
 // directive. The shared cache works transparently; no code change
 // needed in the worker.

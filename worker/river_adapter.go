@@ -41,7 +41,7 @@ type cascadeWorker struct {
 
 // Work executes one job. Lifecycle:
 //
-//  1. Fetch the asset by ID from PG (fresh attrs at dispatch time —
+//  1. Fetch the asset by ID from PG (fresh attrs at dispatch time -
 //     the cascade may have queued the job seconds ago).
 //  2. Build a worker.Job with the asset, run trace, deadline.
 //  3. Call Tool.Run.
@@ -56,7 +56,7 @@ func (w *cascadeWorker) Work(ctx context.Context, j *river.Job[CascadeArgs]) err
 	// already filtered to phases this Tool subscribes to and a
 	// strict equality check would fatal-error every phase past the
 	// first one. Single-phase workers keep the belt-and-braces
-	// check — the queue routing should have split jobs by phase
+	// check - the queue routing should have split jobs by phase
 	// already, so a mismatch means a misconfigured queue name.
 	if w.phase != "" && j.Args.Phase != w.phase {
 		return fmt.Errorf("phase mismatch: got %q, registered for %q",
@@ -68,7 +68,7 @@ func (w *cascadeWorker) Work(ctx context.Context, j *river.Job[CascadeArgs]) err
 		return fmt.Errorf("fetch asset: %w", err)
 	}
 	if asset == nil {
-		// Asset deleted between cascade and dispatch. Not an error —
+		// Asset deleted between cascade and dispatch. Not an error -
 		// just nothing to do.
 		w.logger.Debug("asset gone, dropping job",
 			"asset_id", j.Args.AssetID, "phase", w.phase)
@@ -95,7 +95,7 @@ func (w *cascadeWorker) Work(ctx context.Context, j *river.Job[CascadeArgs]) err
 	tool := w.tool.Name()
 	phase := j.Args.Phase
 
-	// OTel span around Run(). No-op when tracing isn't configured —
+	// OTel span around Run(). No-op when tracing isn't configured -
 	// otel.Tracer returns the global no-op provider in that case.
 	tr := tracing.Tracer("reconmesh/worker")
 	ctx, span := tr.Start(ctx, "Tool.Run", trace.WithAttributes(
@@ -136,7 +136,7 @@ func (w *cascadeWorker) Work(ctx context.Context, j *river.Job[CascadeArgs]) err
 //   - NewAssets via batched UPSERT (one PG round-trip per chunk of
 //     500). The trigger still fires per-row inside the statement, so
 //     each child still gets its own NOTIFY at commit and the cascade
-//     fan-out is preserved — we just stop paying N round-trips.
+//     fan-out is preserved - we just stop paying N round-trips.
 //
 // We don't wrap the two phases in a single transaction. The cascade
 // is idempotent (UniqueOpts dedup on River), so a partial failure
@@ -176,7 +176,7 @@ func startConsumer(ctx context.Context, pool *pgxpool.Pool, manifest *Manifest, 
 			phase:  p.Name,
 		}
 		// AddWorker maps Args type → Worker; we register one
-		// "specialized" view per phase by subclassing — except
+		// "specialized" view per phase by subclassing - except
 		// River doesn't have inheritance. Workaround: a single
 		// Worker[CascadeArgs] with the phase check above. Per-
 		// phase isolation comes from the Queue routing in
@@ -186,7 +186,7 @@ func startConsumer(ctx context.Context, pool *pgxpool.Pool, manifest *Manifest, 
 			MaxWorkers: queueParallelism(p),
 		}
 	}
-	// One shared cascadeWorker handles every phase — Args.Kind() is
+	// One shared cascadeWorker handles every phase - Args.Kind() is
 	// constant ("reconmesh.cascade.v1"). Per-phase isolation comes
 	// from the Queue routing in QueueConfig above: a worker only
 	// pulls jobs from queues it's subscribed to. The strict
@@ -198,7 +198,7 @@ func startConsumer(ctx context.Context, pool *pgxpool.Pool, manifest *Manifest, 
 	// subscribed queues.
 	switch n := len(manifest.Phases); {
 	case n == 0:
-		// No phases — nothing to register. Worker boots, heartbeats,
+		// No phases - nothing to register. Worker boots, heartbeats,
 		// and waits for an admin to add a phase via manifest update.
 	case n == 1:
 		river.AddWorker(workers, &cascadeWorker{

@@ -1,16 +1,16 @@
-// Package metrics — Prometheus exposition for worker-sdk Tools.
+// Package metrics - Prometheus exposition for worker-sdk Tools.
 //
 // Counters / histograms exported by every worker:
 //
 //   reconmesh_worker_jobs_total{tool, phase, outcome}
-//                                 counter — Run() invocations.
+//                                 counter - Run() invocations.
 //                                 outcome ∈ ok, error.
 //   reconmesh_worker_job_duration_seconds{tool, phase}
-//                                 histogram — Run() wall-clock.
+//                                 histogram - Run() wall-clock.
 //   reconmesh_worker_assets_emitted_total{tool, phase, kind}
-//                                 counter — NewAssets count.
+//                                 counter - NewAssets count.
 //   reconmesh_worker_findings_emitted_total{tool, phase, severity}
-//                                 counter — Findings count.
+//                                 counter - Findings count.
 //
 // Mounted at /metrics on the existing admin port (default :9090) by
 // the runtime; the Tool author doesn't have to wire anything.

@@ -31,7 +31,7 @@ import (
 //   --validate               load + validate manifest, exit 0/1. CI-friendly.
 //
 // Returning from Serve only happens on shutdown or fatal init error.
-// Errors are surfaced via os.Exit(1) — workers are restartable processes,
+// Errors are surfaced via os.Exit(1) - workers are restartable processes,
 // not libraries; we don't bubble errors up.
 func Serve(t Tool) {
 	cfg := parseFlags()
@@ -46,7 +46,7 @@ func Serve(t Tool) {
 		die("manifest: %v", err)
 	}
 	if manifest.Tool != t.Name() {
-		die("manifest tool=%q but Tool.Name()=%q — mismatch",
+		die("manifest tool=%q but Tool.Name()=%q - mismatch",
 			manifest.Tool, t.Name())
 	}
 	if cfg.ValidateOnly {
@@ -69,7 +69,7 @@ func Serve(t Tool) {
 	)
 	defer cancel()
 
-	// OTel tracing — no-op when OTEL_EXPORTER_OTLP_ENDPOINT is unset.
+	// OTel tracing - no-op when OTEL_EXPORTER_OTLP_ENDPOINT is unset.
 	// Workers in dev or behind a private network skip the exporter
 	// entirely; OTel-enabled deployments get spans around every Run.
 	tracingShutdown, terr := tracing.Init(ctx, manifest.Tool, logger)
@@ -162,7 +162,7 @@ func die(format string, args ...any) {
 }
 
 // runOnce executes Tool.Run against a synthetic job built from the
-// supplied JSON Asset. No DB, no River — pure local debugging.
+// supplied JSON Asset. No DB, no River - pure local debugging.
 func runOnce(t Tool, m *Manifest, cfg config) {
 	asset, err := parseOnceAsset(cfg.OneShotAssetJSON)
 	if err != nil {

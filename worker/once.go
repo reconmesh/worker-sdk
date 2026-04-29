@@ -7,7 +7,7 @@ import (
 )
 
 // parseOnceAsset accepts the -asset flag's JSON payload. We're
-// deliberately permissive — operators in a hurry might pass just
+// deliberately permissive - operators in a hurry might pass just
 // `{"value":"https://x.com"}` and expect a sane default kind.
 //
 // The function returns errors as plain go errors so Serve's `die` can

@@ -11,7 +11,7 @@
 //   4. Five Upserts with rotating bodies → trigger trims history to
 //      the latest 3 versions per URL.
 //
-// Skipped by default — `go test -tags=integration ./...`.
+// Skipped by default - `go test -tags=integration ./...`.
 package httpcache
 
 import (
@@ -144,7 +144,7 @@ func TestUpsert_BodyChange_HistoryRecorded(t *testing.T) {
 	c := FromPool(pool)
 	ctx := context.Background()
 
-	// First write — establishes baseline.
+	// First write - establishes baseline.
 	if _, err := c.Upsert(ctx, &Entry{
 		URL: "https://x.example.com/", StatusCode: 200,
 		ContentType: "application/javascript",
@@ -153,7 +153,7 @@ func TestUpsert_BodyChange_HistoryRecorded(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Second write — body differs.
+	// Second write - body differs.
 	res, err := c.Upsert(ctx, &Entry{
 		URL: "https://x.example.com/", StatusCode: 200,
 		ContentType: "application/javascript",
@@ -198,7 +198,7 @@ func TestUpsert_BodyChange_HistoryRecorded(t *testing.T) {
 	}
 }
 
-// Trigger enforces 3-row max per URL — the operator-confirmed
+// Trigger enforces 3-row max per URL - the operator-confirmed
 // retention budget. Insert 5 distinct versions and verify only the
 // 3 most-recent prior versions remain in history (the 4th = current
 // body, in tm_http_bodies; the 1st is dropped).

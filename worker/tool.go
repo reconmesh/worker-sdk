@@ -1,9 +1,9 @@
 // Package worker is the public surface of the reconmesh worker SDK.
 //
 // A tool author imports this package, implements [Tool], and calls
-// [Serve]. Every other concern — Postgres pool, River subscription,
+// [Serve]. Every other concern - Postgres pool, River subscription,
 // OpenTelemetry tracing, metrics, finding dedup, graceful shutdown,
-// retries, concurrency limits — is provided by the runtime that
+// retries, concurrency limits - is provided by the runtime that
 // [Serve] starts.
 //
 // The contract is wire-stable across the [Version] major: control
@@ -25,11 +25,11 @@ const Version = "0.1.0"
 // purpose: every method here is a method every consumer must care about.
 //
 // Cross-cutting concerns (validation of the manifest, idempotence
-// enforcement, metric emission) are NOT in this interface — they're
+// enforcement, metric emission) are NOT in this interface - they're
 // in the SDK runtime. A tool author who reads this file should leave
 // with a complete mental model of what their job is.
 type Tool interface {
-	// Name returns the canonical tool identifier — must match the
+	// Name returns the canonical tool identifier - must match the
 	// `tool:` field in manifest.yaml. Used as a label on metrics, as
 	// the `findings.tool` column, and as the worker registration key.
 	Name() string
@@ -45,7 +45,7 @@ type Tool interface {
 	//   - The runtime guarantees Run is invoked at most once per
 	//     (run_id, asset_id, phase) for the same River job ID. If
 	//     the worker crashes mid-run, the same job is redelivered
-	//     with the SAME job ID — Run MUST be idempotent (see
+	//     with the SAME job ID - Run MUST be idempotent (see
 	//     docs/IDEMPOTENCE.md).
 	//   - Returning an error nacks the job. The runtime decides
 	//     retry vs dead-letter based on error class (see ErrFatal,
@@ -79,7 +79,7 @@ type Updatable interface {
 // already in flight see consistent values for their duration but
 // new jobs pick up the change.
 //
-// Returning an error logs but doesn't crash the worker — bad config
+// Returning an error logs but doesn't crash the worker - bad config
 // can be rolled back by the operator from the same UI.
 type Configurable interface {
 	ReloadConfig(ctx context.Context, cfg map[string]any) error
@@ -90,7 +90,7 @@ type Configurable interface {
 // Field stability: every field here is part of the wire contract.
 // Adding a new field is a MINOR; renaming or removing one is a MAJOR.
 type Job struct {
-	// ID is the River job ID. Idempotency key — the runtime guarantees
+	// ID is the River job ID. Idempotency key - the runtime guarantees
 	// at-least-once delivery; identical IDs in two invocations mean
 	// the job is being retried.
 	ID int64
@@ -119,7 +119,7 @@ type Job struct {
 	// log-only use cases where the trace context isn't propagated.
 	TraceID string
 	// ForceFresh signals the operator triggered this run manually and
-	// wants live data — caches (httpcache.Lookup, dns-service LRU,
+	// wants live data - caches (httpcache.Lookup, dns-service LRU,
 	// in-memory tool-side memo, …) MUST be bypassed for this Job.
 	// Tools that don't cache anything can ignore this field; tools
 	// that cache should branch on it BEFORE the cache lookup, then
@@ -132,7 +132,7 @@ type Job struct {
 //
 // All slices may be nil. The runtime never inspects nil slices.
 // Empty Result + nil error is a valid "we ran cleanly, found nothing"
-// outcome — counted as success, not skipped.
+// outcome - counted as success, not skipped.
 type Result struct {
 	// NewAssets are children to add to the asset graph. The runtime
 	// upserts them by (scope_id, kind, value); duplicates are merged.
@@ -156,12 +156,12 @@ type Result struct {
 // nouns: "subdomain", "host", "port", "service", "url", "js_file".
 //
 // Value is the canonical, comparable identity within Kind. Two assets
-// with the same (scope, kind, value) are the same asset — choose Value
+// with the same (scope, kind, value) are the same asset - choose Value
 // so that re-discovery collapses (lowercase host, normalize URL, etc.).
 //
 // Attrs carries kind-specific metadata. Consult docs/ASSETS.md for the
 // agreed-upon shape of each kind. Adding new attrs without coordination
-// is fine — readers should only depend on documented attrs.
+// is fine - readers should only depend on documented attrs.
 type Asset struct {
 	ID       string         `json:"id,omitempty"`        // set by runtime, ignored on write
 	ScopeID  string         `json:"scope_id"`
@@ -203,7 +203,7 @@ type Finding struct {
 	// Title is the human-readable headline shown in the UI.
 	Title string
 	// Data is the worker-specific evidence. Sort keys, normalize URLs,
-	// lower-case strings — anything that doesn't change meaning but
+	// lower-case strings - anything that doesn't change meaning but
 	// affects equality should be canonical here so the dedup hash
 	// stays stable across runs.
 	Data map[string]any

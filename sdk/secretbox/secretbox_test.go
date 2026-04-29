@@ -237,7 +237,7 @@ func TestDecryptFields_HappyPath(t *testing.T) {
 }
 
 // Failed decrypt reports the path AND leaves ciphertext in cfg
-// (worker's HTTP call fails loudly with garbage credential —
+// (worker's HTTP call fails loudly with garbage credential -
 // better than silently dropping the field and running unauth'd).
 func TestDecryptFields_LeavesFailedAsCiphertext(t *testing.T) {
 	k1 := makeKey(t)
@@ -254,14 +254,14 @@ func TestDecryptFields_LeavesFailedAsCiphertext(t *testing.T) {
 	}
 	// CRUCIAL: cfg["api_key"] is still the ciphertext. Worker's
 	// downstream HTTP call will use it as a literal key and fail
-	// auth — operator visible.
+	// auth - operator visible.
 	if cfg["api_key"] != ct {
 		t.Errorf("failed decrypt should leave ciphertext, got %v", cfg["api_key"])
 	}
 }
 
 // Legacy plaintext (no enc:v1: prefix) passes through untouched
-// — smooth migration path for pre-I22 columns.
+// - smooth migration path for pre-I22 columns.
 func TestDecryptFields_LegacyPlaintextPassthrough(t *testing.T) {
 	k := makeKey(t)
 	cfg := map[string]any{"api_key": "legacy-plaintext"}

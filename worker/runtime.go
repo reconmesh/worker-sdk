@@ -27,7 +27,7 @@ import (
 // runtime wires Postgres + River + admin HTTP. Built by Serve();
 // stage two adds the actual River consumer, asset writer, heartbeat
 // loop and worker self-registration. The Tool author never touches
-// this code — Serve() is the only public entry.
+// this code - Serve() is the only public entry.
 //
 // Lifecycle:
 //
@@ -51,7 +51,7 @@ type runtime struct {
 	writer *AssetWriter
 	admin  *http.Server
 
-	// instance is the unique identifier for this worker process —
+	// instance is the unique identifier for this worker process -
 	// "<tool>-<random>". It lands in workers.instance and is used
 	// as the heartbeat key.
 	instance string
@@ -142,7 +142,7 @@ func (rt *runtime) Run(ctx context.Context) error {
 
 	// Fire ReloadConfig once at boot with the merged manifest⊕override
 	// config, then LISTEN for live edits. Skipped silently when the
-	// Tool doesn't implement Configurable — the SDK doesn't force
+	// Tool doesn't implement Configurable - the SDK doesn't force
 	// every worker to opt in.
 	if _, ok := rt.tool.(Configurable); ok {
 		if err := rt.applyConfig(ctx); err != nil {
@@ -160,7 +160,7 @@ func (rt *runtime) Run(ctx context.Context) error {
 // applyConfig reads tool_configs.config for this tool, deep-merges
 // it onto the manifest's static config, decrypts manifest-declared
 // secret fields (Stage I22), and hands the result to
-// Tool.ReloadConfig. Best-effort — a transient PG error logs and
+// Tool.ReloadConfig. Best-effort - a transient PG error logs and
 // returns; the worker keeps running with whatever config it had.
 //
 // Merge rule (mirrors controlplane/internal/api/plugins.go):
@@ -170,7 +170,7 @@ func (rt *runtime) Run(ctx context.Context) error {
 // Decrypt rule (I22): for every dotted-path in manifest.Secrets,
 // if the merged value is "enc:v1:..." we Decrypt with
 // $RECON_SECRETS_KEY. A failed decrypt leaves the ciphertext in
-// place + logs the path — the worker's downstream HTTP call then
+// place + logs the path - the worker's downstream HTTP call then
 // fails loudly with garbage credentials, which is the right
 // behavior (silently dropping the field would mean unauthenticated
 // calls).
@@ -196,7 +196,7 @@ func (rt *runtime) decryptSecrets(merged map[string]any) {
 	if rt.secretsKey == nil {
 		k, err := secretbox.LoadKeyFromEnv()
 		if err != nil {
-			rt.logger.Warn("secretbox key not loaded — secret config fields will arrive as ciphertext",
+			rt.logger.Warn("secretbox key not loaded - secret config fields will arrive as ciphertext",
 				"tool", rt.manifest.Tool,
 				"hint", "set RECON_SECRETS_KEY to a base64-encoded 32-byte value")
 			return
@@ -213,7 +213,7 @@ func (rt *runtime) decryptSecrets(merged map[string]any) {
 		// the downstream call fails loudly. Operator visible:
 		// the slog line tells them which field couldn't decrypt;
 		// they rotate the key or re-paste the secret in the UI.
-		rt.logger.Warn("secret decrypt failed — worker will see ciphertext for these fields",
+		rt.logger.Warn("secret decrypt failed - worker will see ciphertext for these fields",
 			"tool", rt.manifest.Tool, "fields", failed)
 	}
 }
@@ -259,7 +259,7 @@ func mergeConfigInto(a, b map[string]any) map[string]any {
 
 // configLoop subscribes to PG NOTIFY 'tool_config_changed' and fires
 // ReloadConfig whenever the operator edits this tool's override.
-// One LISTEN connection per worker — cheap; pgx pool reserves it.
+// One LISTEN connection per worker - cheap; pgx pool reserves it.
 func (rt *runtime) configLoop(ctx context.Context) {
 	conn, err := rt.pool.Acquire(ctx)
 	if err != nil {
@@ -315,7 +315,7 @@ func (rt *runtime) configLoop(ctx context.Context) {
 
 // registerWorker UPSERTs into the workers table so the control
 // plane's manifest cache picks us up. Stores the full manifest as
-// JSONB — that's what the cascade engine reads when matching a new
+// JSONB - that's what the cascade engine reads when matching a new
 // asset to candidate phases. Doing this directly via PG (not via
 // HTTP) saves a round trip and works even when the control plane
 // is down.
@@ -367,7 +367,7 @@ func (rt *runtime) registerWorker(ctx context.Context) error {
 // manifest cache filters on `last_heartbeat > NOW() - 5 minutes`, so
 // missing two heartbeats removes us from the cascade routing pool.
 //
-// We intentionally don't reload the manifest here — the worker boots
+// We intentionally don't reload the manifest here - the worker boots
 // once with its compiled-in tool and manifest. Operators wanting a
 // new manifest restart the worker.
 func (rt *runtime) heartbeatLoop(ctx context.Context) {
@@ -417,7 +417,7 @@ func (rt *runtime) startAdmin() error {
 		_ = json.NewEncoder(w).Encode(rt.manifest)
 	})
 	mux.HandleFunc("/admin/update", rt.handleAdminUpdate)
-	// Prometheus metrics — labels carry tool + phase + outcome.
+	// Prometheus metrics - labels carry tool + phase + outcome.
 	// Mounted on the same admin port so a single scrape config
 	// covers every replica without per-worker port-mapping.
 	mux.Handle("/metrics", metrics.Handler())
@@ -526,7 +526,7 @@ func manifestAsJSON(m *Manifest) ([]byte, error) {
 	// Use YAML's encoder via marshal-then-decode to a typed struct,
 	// then JSON-marshal. The `yaml:"foo"` tags differ from the
 	// implicit JSON tags, but both struct shapes are isomorphic for
-	// our manifest — json.Marshal does the right thing.
+	// our manifest - json.Marshal does the right thing.
 	_ = yaml.Marshal // referenced so the import survives if a future
 	// edit removes the encode path
 	return json.Marshal(m)

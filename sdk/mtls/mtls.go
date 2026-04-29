@@ -1,7 +1,7 @@
-// Package mtls — small helper for workers that talk to internal
+// Package mtls - small helper for workers that talk to internal
 // HTTPS endpoints (controlplane / dns-service) over mTLS.
 //
-// The worker-sdk doesn't FORCE mTLS — when the env vars are unset
+// The worker-sdk doesn't FORCE mTLS - when the env vars are unset
 // the helper returns http.DefaultClient. Operators who deploy with
 // gen-certs.sh export:
 //
@@ -29,12 +29,12 @@ import (
 // Client returns a process-wide *http.Client with the worker's
 // client cert + the cluster CA. Cached so we don't re-load certs on
 // every HTTP call. When TLS env is unset, returns http.DefaultClient
-// — caller doesn't need to special-case.
+// - caller doesn't need to special-case.
 func Client() *http.Client {
 	clientOnce.Do(func() {
 		c, err := build()
 		if err != nil {
-			// Log to stderr by default — workers using this helper
+			// Log to stderr by default - workers using this helper
 			// in their main usually have a *slog.Logger but we
 			// don't take it as a dep. The worker-sdk runtime logs
 			// the same condition at startup.
@@ -63,7 +63,7 @@ func build() (*http.Client, error) {
 	certPath := os.Getenv("RECONMESH_TLS_CERT")
 	keyPath := os.Getenv("RECONMESH_TLS_KEY")
 	if caPath == "" && certPath == "" && keyPath == "" {
-		// No TLS configured — caller gets the stdlib default. Keeps
+		// No TLS configured - caller gets the stdlib default. Keeps
 		// dev environments and behind-proxy deployments simple.
 		return http.DefaultClient, nil
 	}

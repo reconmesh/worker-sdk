@@ -25,12 +25,12 @@ parts under its control (asset upserts, finding dedup hashes), but
 - **Asset upserts**: the runtime writes assets via
   `INSERT ... ON CONFLICT (scope_id, kind, value) DO UPDATE SET ...`
   Re-emitting the same asset from a retried `Run` only bumps
-  `last_seen` + merges `attrs` — no duplicate row.
+  `last_seen` + merges `attrs` - no duplicate row.
 
 - **Finding dedup**: every finding's `(asset_id, dedup_hash)` is the
   uniqueness key. Identical findings re-emitted only update
   `last_seen`. The hash is computed from canonicalized
-  `Kind + Severity + Data` — see `dedup.go`.
+  `Kind + Severity + Data` - see `dedup.go`.
 
 - **Job ack/nack semantics**: returning `(Result, nil)` ACKs and
   commits the result transactionally. Returning a non-nil error NACKs;
@@ -88,7 +88,7 @@ runtime) so you share the transaction.
 
 ### …shells out to a subprocess
 
-The subprocess might leave files, write to the network, etc. — apply
+The subprocess might leave files, write to the network, etc. - apply
 the rules above to whatever the subprocess does. Wrap it in a
 deterministic key + cache layer.
 

@@ -1,4 +1,4 @@
-// Package tracing — OTel setup helper for workers + controlplane.
+// Package tracing - OTel setup helper for workers + controlplane.
 //
 // Init reads the standard OTel envs:
 //
@@ -7,7 +7,7 @@
 //	OTEL_RESOURCE_ATTRIBUTES     e.g. deployment.environment=dev
 //
 // When OTEL_EXPORTER_OTLP_ENDPOINT is empty, Init returns a no-op
-// shutdown — no exporter, no goroutines, no overhead. Workers /
+// shutdown - no exporter, no goroutines, no overhead. Workers /
 // services who run without observability stay simple.
 //
 // Caller stashes the returned shutdown func and defers it; spans

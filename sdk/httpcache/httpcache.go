@@ -1,7 +1,7 @@
 // Package httpcache is the cluster-wide HTTP body cache. tm-httpx
 // writes after each fingerprint scan; techmapper-worker (and future
 // secrets / sourcemap / link-extractor plugins) read here before
-// issuing a network fetch — between recheck waves nothing leaves the
+// issuing a network fetch - between recheck waves nothing leaves the
 // cluster, only the 24h cron sweep refreshes.
 //
 // Backed by PG table `tm_http_bodies` (see
@@ -61,7 +61,7 @@ type Entry struct {
 // UpsertResult reports whether the body changed since the prior write
 // for this URL. Callers use it to emit asset_event "url_body_changed"
 // or skip a downstream re-analysis. First-write behavior:
-// PreviousSHA256 nil, Changed false — establishes the baseline.
+// PreviousSHA256 nil, Changed false - establishes the baseline.
 type UpsertResult struct {
 	PreviousSHA256 []byte // nil on first fetch
 	Changed        bool   // true when prior existed and bytes differ
@@ -74,7 +74,7 @@ type UpsertResult struct {
 type Cache struct {
 	pool *pgxpool.Pool
 	mu   sync.RWMutex
-	// staleAfter — lookups returning a row older than this are
+	// staleAfter - lookups returning a row older than this are
 	// treated as misses so the caller refetches. Operators tune down
 	// to tighten freshness, up to favor network economy.
 	//
@@ -97,7 +97,7 @@ func (c *Cache) staleAfterRead() time.Duration {
 // cluster_settings listener calls this so an operator edit takes
 // effect immediately rather than waiting for a worker restart.
 // Zero or negative disables the staleness check (every cached row
-// counts as fresh — useful for forensic mode).
+// counts as fresh - useful for forensic mode).
 func (c *Cache) SetStaleAfter(d time.Duration) {
 	c.mu.Lock()
 	c.staleAfter = d
@@ -110,14 +110,14 @@ func (c *Cache) SetStaleAfter(d time.Duration) {
 func (c *Cache) StaleAfter() time.Duration { return c.staleAfterRead() }
 
 // Per-process counters. Expose as Prom metrics via the worker-sdk
-// metrics package — incremented on every Lookup / Upsert path so
+// metrics package - incremented on every Lookup / Upsert path so
 // the operator can see "between waves we hit 95% on the body cache".
 var (
 	cntLookupHit   = prometheus.NewCounter(prometheus.CounterOpts{Name: "reconmesh_httpcache_lookups_hit_total", Help: "Body-cache lookups that returned a fresh entry."})
 	cntLookupMiss  = prometheus.NewCounter(prometheus.CounterOpts{Name: "reconmesh_httpcache_lookups_miss_total", Help: "Body-cache lookups with no row, an expired row, or a backend error."})
 	cntLookupStale = prometheus.NewCounter(prometheus.CounterOpts{Name: "reconmesh_httpcache_lookups_stale_total", Help: "Body-cache lookups that found a row past StaleAfter (treated as a miss)."})
 	cntUpsert      = prometheus.NewCounter(prometheus.CounterOpts{Name: "reconmesh_httpcache_upserts_total", Help: "Body-cache writes (one per cached response)."})
-	cntBodyChanged = prometheus.NewCounter(prometheus.CounterOpts{Name: "reconmesh_httpcache_body_changed_total", Help: "Upserts where the new body sha256 differed from the prior — drives Phase 3 url_body_changed asset events."})
+	cntBodyChanged = prometheus.NewCounter(prometheus.CounterOpts{Name: "reconmesh_httpcache_body_changed_total", Help: "Upserts where the new body sha256 differed from the prior - drives Phase 3 url_body_changed asset events."})
 )
 
 func init() {
@@ -218,7 +218,7 @@ func (c *Cache) refreshStaleFromCluster(ctx context.Context) {
 }
 
 // Close releases the pool. Safe to call multiple times. No-op when
-// the pool was provided externally via FromPool — caller owns it.
+// the pool was provided externally via FromPool - caller owns it.
 func (c *Cache) Close() {
 	if c.pool != nil {
 		c.pool.Close()
@@ -294,7 +294,7 @@ func (c *Cache) Lookup(ctx context.Context, rawURL string) (*Entry, error) {
 }
 
 // Upsert writes (or refreshes) an entry. Idempotent on the url_hash
-// PK — re-fetching the same URL within a wave overwrites the prior
+// PK - re-fetching the same URL within a wave overwrites the prior
 // row, including fetched_at so freshness rolls forward.
 func (c *Cache) Upsert(ctx context.Context, e *Entry) (*UpsertResult, error) {
 	if e == nil || e.URL == "" {
@@ -324,7 +324,7 @@ func (c *Cache) Upsert(ctx context.Context, e *Entry) (*UpsertResult, error) {
 	res := &UpsertResult{}
 
 	// One transaction so the history INSERT and the bodies UPSERT are
-	// atomic — a crash mid-flow either leaves the prior state intact
+	// atomic - a crash mid-flow either leaves the prior state intact
 	// or commits the whole change.
 	tx, err := c.pool.Begin(ctx)
 	if err != nil {
@@ -334,7 +334,7 @@ func (c *Cache) Upsert(ctx context.Context, e *Entry) (*UpsertResult, error) {
 
 	// Read the prior row (if any) for the diff. We snapshot its
 	// payload columns so the history INSERT can capture them WITHOUT
-	// duplicating the latest-row body — the history row stores the
+	// duplicating the latest-row body - the history row stores the
 	// PRIOR content, not the new one.
 	var (
 		priorSHA       []byte
@@ -358,13 +358,13 @@ func (c *Cache) Upsert(ctx context.Context, e *Entry) (*UpsertResult, error) {
 	case err == nil:
 		hasPrior = true
 	case errors.Is(err, pgx.ErrNoRows):
-		// First fetch — fall through.
+		// First fetch - fall through.
 	default:
 		return nil, fmt.Errorf("httpcache: prior lookup: %w", err)
 	}
 
 	// Decide whether the body changed. We treat "prior had no SHA"
-	// (pre-migration row) as "unknown" — same body bytes are treated
+	// (pre-migration row) as "unknown" - same body bytes are treated
 	// as unchanged, but if priorSHA is nil we compute it inline so
 	// the comparison still works.
 	if hasPrior {
@@ -465,7 +465,7 @@ func canonicalize(rawURL string) string {
 	}
 	u.Scheme = strings.ToLower(u.Scheme)
 	u.Host = strings.ToLower(u.Host)
-	// Strip default ports — most servers respond identically on the
+	// Strip default ports - most servers respond identically on the
 	// implicit and explicit forms. Hash collisions otherwise.
 	if (u.Scheme == "http" && strings.HasSuffix(u.Host, ":80")) ||
 		(u.Scheme == "https" && strings.HasSuffix(u.Host, ":443")) {
@@ -474,7 +474,7 @@ func canonicalize(rawURL string) string {
 	if u.Path == "" {
 		u.Path = "/"
 	}
-	// Drop fragment — never sent to the server.
+	// Drop fragment - never sent to the server.
 	u.Fragment = ""
 	return u.String()
 }

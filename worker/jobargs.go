@@ -3,7 +3,7 @@ package worker
 import "github.com/google/uuid"
 
 // JobKind is the River "kind" string the cascade emits and we
-// consume. It MUST match controlplane/internal/jobtype.JobKind —
+// consume. It MUST match controlplane/internal/jobtype.JobKind -
 // renaming requires a coordinated rollout (push controlplane first
 // with both old + new, then push workers, then drop old).
 //

@@ -60,7 +60,7 @@ func TestDedupHash_NestedMapsCanonical(t *testing.T) {
 }
 
 func TestDedupHash_SliceOrderMatters(t *testing.T) {
-	// Slice order is intentionally significant — re-ordered evidence
+	// Slice order is intentionally significant - re-ordered evidence
 	// is rare and ought to produce a distinct hash so re-runs that
 	// happen to enumerate in a different order don't suppress what
 	// might be a meaningful change.

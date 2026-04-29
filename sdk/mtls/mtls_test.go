@@ -98,7 +98,7 @@ func TestBuild_ValidPair_ReturnsConfiguredClient(t *testing.T) {
 }
 
 // writeSelfSignedPair generates an RSA-2048 self-signed cert+key pair
-// in dir and returns the file paths. Good enough for build() — we
+// in dir and returns the file paths. Good enough for build() - we
 // don't actually open a TLS connection here.
 func writeSelfSignedPair(t *testing.T, dir string) (certPath, keyPath string) {
 	t.Helper()
