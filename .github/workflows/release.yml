@@ -1,0 +1,32 @@
+# Library release pipeline. worker-sdk is a Go library · no binaries
+# to ship and no Docker image to push. The pipeline exists purely to
+# create a GitHub Release page on every v* tag with auto-generated
+# notes, so consumers (every worker repo) can browse the changelog
+# at github.com/reconmesh/worker-sdk/releases without scrolling git
+# log.
+#
+# Bumping consumers happens out-of-band: each worker module pins
+# `worker-sdk vX.Y.Z` in its go.mod and bumps when ready.
+name: release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') }}
+          generate_release_notes: true
+          body: |
+            See [CHANGELOG.md](./CHANGELOG.md) for the operator-facing
+            summary by version. Auto-notes below capture the commits
+            since the previous tag.
