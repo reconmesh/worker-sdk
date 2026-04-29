@@ -94,11 +94,14 @@ A worker with that body will:
 - [`docs/IDEMPOTENCE.md`](./docs/IDEMPOTENCE.md) — why your `Run`
   must be safe to retry, what the SDK guarantees vs what you own
 - [`docs/MANIFEST.md`](./docs/MANIFEST.md) — the YAML schema in detail
-
-Other contracts (asset shape, finding shape, concurrency, observability)
-live as godoc comments on the public types in `worker/` for now ·
-the goal is to keep the source as the canonical reference and only
-write a long-form doc when the godoc isn't enough.
+- [`docs/ASSETS.md`](./docs/ASSETS.md) — kinds, attrs conventions per
+  kind, JSONB round-trip gotchas
+- [`docs/FINDINGS.md`](./docs/FINDINGS.md) — finding shape, dedup hash
+  recipe, kinds + severity ladder
+- [`docs/CONCURRENCY.md`](./docs/CONCURRENCY.md) — per-host limits,
+  AIMD, circuit breaker, dns-side concurrency
+- [`docs/OBSERVABILITY.md`](./docs/OBSERVABILITY.md) — free metrics
+  the SDK exposes, custom metrics + structured logging conventions
 
 ## Changelog
 
