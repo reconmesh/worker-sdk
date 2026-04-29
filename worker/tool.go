@@ -85,6 +85,77 @@ type Configurable interface {
 	ReloadConfig(ctx context.Context, cfg map[string]any) error
 }
 
+// Healthchecker is an optional interface a Tool implements to
+// surface its functional state to the Modules admin page. The SDK
+// runtime calls Healthcheck periodically (default 60s) and writes
+// the result to the controlplane's module_health table; the UI
+// renders the latest status with the appropriate severity color
+// and the operator-facing error message.
+//
+// Use cases:
+//   - tm-uncover / tm-c99: probe the API key against a cheap endpoint
+//     so a revoked key surfaces as "API key invalid" instead of
+//     silent zero-result jobs
+//   - tm-vulnx: validate the embedded CVE DB loaded successfully
+//   - tm-shodan-passive / tm-favicon-hash: ping the upstream service
+//     so a multi-hour outage surfaces as "service_unreachable"
+//
+// Healthcheck MUST be cheap and non-mutating · the runtime calls it
+// on a schedule whether or not the worker is processing jobs.
+// Tools without this interface get a default "unknown" status that
+// flips to "healthy" when the worker successfully completes any
+// Run() and to "unhealthy" when Run() returns a HealthError.
+type Healthchecker interface {
+	Healthcheck(ctx context.Context) HealthReport
+}
+
+// HealthReport is what Healthcheck returns. The runtime forwards
+// this to the controlplane's module_health endpoint without
+// transformation · keep it small.
+type HealthReport struct {
+	// Status is the overall verdict: "healthy" / "degraded" /
+	// "unhealthy". "degraded" means the tool can still serve some
+	// requests (e.g. one of N upstreams is down).
+	Status string
+	// Class names the failure mode when Status != "healthy" so the
+	// UI can render targeted help. See module_health.error_class
+	// taxonomy.
+	Class string
+	// Message is operator-facing, single-line · drop into a tooltip.
+	Message string
+	// Extra is free-form structured detail (which upstream failed,
+	// quota remaining, last good response timestamp, ...). Stored
+	// as JSONB; rendered as a key/value list in the UI.
+	Extra map[string]any
+}
+
+// HealthError is a sentinel error class workers return from Run()
+// when a transient or persistent infrastructure issue prevents the
+// job from running. The runtime catches it, reports the class to
+// the controlplane, and acks the job (returning ErrTransient via
+// the standard path retries; HealthError is "this whole module is
+// broken, don't pile on retries").
+type HealthError struct {
+	Class   string
+	Message string
+}
+
+func (e *HealthError) Error() string {
+	if e.Class == "" {
+		return e.Message
+	}
+	return e.Class + ": " + e.Message
+}
+
+// NewHealthError builds a HealthError. Helper because Class strings
+// must come from the closed-set taxonomy:
+//
+//	worker.NewHealthError("api_key_invalid", "Shodan returned 401")
+//	worker.NewHealthError("service_unreachable", "DNS lookup failed for ...")
+func NewHealthError(class, message string) *HealthError {
+	return &HealthError{Class: class, Message: message}
+}
+
 // Job is the input to Tool.Run.
 //
 // Field stability: every field here is part of the wire contract.

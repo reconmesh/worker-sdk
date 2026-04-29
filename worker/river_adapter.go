@@ -33,6 +33,11 @@ type cascadeWorker struct {
 	tool   Tool
 	writer *AssetWriter
 	logger *slog.Logger
+	// rt is the back-ref to the SDK runtime so the adapter can
+	// record Run() outcomes (passive health counters + HealthError
+	// fast-path). nil-tolerant · the validate / one-shot paths
+	// don't construct a runtime.
+	rt *runtime
 	// phase is the phase name this Worker subscribes to. We use it
 	// to ignore jobs that landed on us by mistake (router glitch),
 	// surfacing a fatal error rather than silently running.
@@ -107,6 +112,9 @@ func (w *cascadeWorker) Work(ctx context.Context, j *river.Job[CascadeArgs]) err
 
 	res, err := w.tool.Run(ctx, job)
 	metrics.JobDuration.WithLabelValues(tool, phase).Observe(time.Since(start).Seconds())
+	if w.rt != nil {
+		w.rt.recordRunOutcome(err)
+	}
 	if err != nil {
 		metrics.JobsTotal.WithLabelValues(tool, phase, "error").Inc()
 		span.RecordError(err)
@@ -162,7 +170,7 @@ func (w *cascadeWorker) persist(ctx context.Context, args CascadeArgs, res Resul
 // it. One worker.Worker registration per phase declared in the
 // manifest. Each phase gets its own queue (matches the cascade's
 // producer side in controlplane).
-func startConsumer(ctx context.Context, pool *pgxpool.Pool, manifest *Manifest, tool Tool, writer *AssetWriter, logger *slog.Logger) (*river.Client[pgx.Tx], error) {
+func startConsumer(ctx context.Context, rt *runtime, pool *pgxpool.Pool, manifest *Manifest, tool Tool, writer *AssetWriter, logger *slog.Logger) (*river.Client[pgx.Tx], error) {
 	workers := river.NewWorkers()
 	queues := map[string]river.QueueConfig{}
 	for _, p := range manifest.Phases {
@@ -205,6 +213,7 @@ func startConsumer(ctx context.Context, pool *pgxpool.Pool, manifest *Manifest, 
 			tool:   tool,
 			writer: writer,
 			logger: logger,
+			rt:     rt,
 			phase:  manifest.Phases[0].Name,
 		})
 	default:
@@ -213,6 +222,7 @@ func startConsumer(ctx context.Context, pool *pgxpool.Pool, manifest *Manifest, 
 			tool:   tool,
 			writer: writer,
 			logger: logger,
+			rt:     rt,
 			// phase intentionally empty
 		})
 	}

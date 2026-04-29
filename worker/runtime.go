@@ -66,6 +66,12 @@ type runtime struct {
 	// that has manifest.Secrets non-empty.
 	secretsKey *secretbox.Key
 
+	// passive health counters · used when the Tool doesn't implement
+	// the explicit Healthchecker interface. healthLoop derives a
+	// status from these. River adapter bumps them after each Run().
+	totalRuns           int32
+	consecutiveFailures int32
+
 	closeOnce sync.Once
 }
 
@@ -133,7 +139,7 @@ func (rt *runtime) Run(ctx context.Context) error {
 		return fmt.Errorf("admin: %w", err)
 	}
 
-	rc, err := startConsumer(ctx, pool, rt.manifest, rt.tool, rt.writer, rt.logger)
+	rc, err := startConsumer(ctx, rt, pool, rt.manifest, rt.tool, rt.writer, rt.logger)
 	if err != nil {
 		return fmt.Errorf("river consumer: %w", err)
 	}
@@ -142,6 +148,7 @@ func (rt *runtime) Run(ctx context.Context) error {
 		"queues", phaseNames(rt.manifest))
 
 	go rt.heartbeatLoop(ctx)
+	go rt.healthLoop(ctx)
 
 	// Fire ReloadConfig once at boot with the merged manifest⊕override
 	// config, then LISTEN for live edits. Skipped silently when the
