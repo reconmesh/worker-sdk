@@ -12,6 +12,15 @@ this project follows [Semantic Versioning](https://semver.org/).
   test (`TestLoadManifest_DescriptionRoundTrip`). Wire-additive · workers
   without a description still register cleanly.
 
+### Fixed
+- `Manifest.Validate` accepted `priority_hint` 0..4; widened to 0..9.
+  5 modules (tm-vulnx=8, tm-dork=7, tm-ctwatch=6, tm-jsfinder=5,
+  tm-uncover=5) shipped with values > 4 and would `worker.Serve()`-fail
+  at boot with `manifest validate: phases[0].priority_hint must be
+  0..4`. The cascade engine in controlplane/internal/cascade clamps
+  to River's 1..4 range at job-insertion time, so 5..9 are documentary
+  intent that map to River priority 4. Pin test reflects the new shape.
+
 ## [v0.5.3] - 2026-04-29
 
 Session marathon · all additive · no wire-contract break vs v0.5.2.
