@@ -64,10 +64,19 @@ func TestManifestValidate(t *testing.T) {
 			wantErr: "consumes.kinds",
 		},
 		{
-			name: "invalid priority",
+			name: "priority 5 (documentary intent · clamped to River 4 by cascade)",
 			manifest: Manifest{
 				Tool: "tm-demo", Version: "0.1.0",
 				Phases: []Phase{{Name: "p", PriorityHint: 5,
+					Consumes: ConsumeSpec{Kinds: []string{"url"}}}},
+			},
+			// no error · 5 is valid documentary-intent (will clamp at runtime)
+		},
+		{
+			name: "priority too high (10)",
+			manifest: Manifest{
+				Tool: "tm-demo", Version: "0.1.0",
+				Phases: []Phase{{Name: "p", PriorityHint: 10,
 					Consumes: ConsumeSpec{Kinds: []string{"url"}}}},
 			},
 			wantErr: "priority_hint",

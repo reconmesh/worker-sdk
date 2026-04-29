@@ -89,8 +89,11 @@ type Phase struct {
 	// Job.Deadline.
 	TimeoutSeconds int `yaml:"timeout_seconds,omitempty"`
 	// PriorityHint biases this phase's jobs in the queue. 1 (highest)
-	// to 4 (lowest, default). Operators can still override on a
-	// per-run basis.
+	// through 9 (lowest); 0 means "use the run's default". The
+	// cascade engine clamps to River's 1..4 range at queue insertion
+	// (River only supports those four), so values 5..9 are documentary
+	// intent · they all map to River priority 4. Operators can still
+	// override on a per-run basis.
 	PriorityHint int `yaml:"priority_hint,omitempty"`
 	// UI describes how the web-ui should surface this phase's
 	// observations. Two modes:
@@ -290,8 +293,8 @@ func (m *Manifest) Validate() error {
 				return fmt.Errorf("phases[%d].consumes.kinds[%d] %q invalid", i, j, k)
 			}
 		}
-		if p.PriorityHint < 0 || p.PriorityHint > 4 {
-			return fmt.Errorf("phases[%d].priority_hint must be 0..4", i)
+		if p.PriorityHint < 0 || p.PriorityHint > 9 {
+			return fmt.Errorf("phases[%d].priority_hint must be 0..9", i)
 		}
 		if p.TimeoutSeconds < 0 {
 			return fmt.Errorf("phases[%d].timeout_seconds negative", i)
