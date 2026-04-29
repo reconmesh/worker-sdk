@@ -84,7 +84,9 @@ phases:
 - `tool` matches `[a-z][a-z0-9]*([-_][a-z0-9]+)*`
 - ≥1 phase, no duplicate phase names
 - each phase has ≥1 `consumes.kinds`
-- `priority_hint` in 0..4
+- `priority_hint` in 0..9 · the cascade engine clamps to River's 1..4
+  range at job-insertion, so 5..9 are documentary intent ("even less
+  urgent") that all map to River priority 4
 - `timeout_seconds` ≥ 0
 
 The filter expression isn't parsed at boot (it lives in the control
