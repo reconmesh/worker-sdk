@@ -6,6 +6,8 @@ this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [v0.5.4] - 2026-04-29
+
 ### Added
 - `Manifest.Description` · optional one-line operator-facing summary
   surfaced on the controlplane Plugins page. YAML round-trip pinned by
