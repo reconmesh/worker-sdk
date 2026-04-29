@@ -29,25 +29,29 @@ See `../platform/docs/VERSIONING.md` for the org-wide policy.
 worker-sdk/
 ├── worker/             # the public package; what `import` consumers use
 │   ├── tool.go         # Tool interface, Job, Result, Finding, Asset
-│   ├── manifest.go     # YAML manifest schema + load/validate
+│   ├── manifest.go     # YAML manifest schema + load/validate (incl. Description)
+│   ├── jobargs.go      # CascadeArgs wire contract (matches controlplane/jobtype)
 │   ├── serve.go        # Serve() entry point: River + signal handling
-│   ├── runtime.go      # PG pool, metrics, OTel
-│   ├── asset_writer.go # UpsertAsset + sync.Pool fingerprint (G1)
+│   ├── runtime.go      # PG pool, metrics, OTel, config reload
+│   ├── river_adapter.go# River JobArgs binding + worker registration
+│   ├── asset_writer.go # UpsertAsset + sync.Pool fingerprint (G1, -27% bytes/op)
 │   ├── dedup.go        # finding hash canonicalization
-│   └── filter/         # `consumes.filter` parser + PG predicate compile
+│   └── once.go         # --once / --asset synthetic-job mode (no DB, no River)
 ├── sdk/                # opt-in helpers · workers import only what they need
-│   ├── mtls/           # cleanhttp-style http.Client with mTLS roots
+│   ├── mtls/           # cleanhttp-style http.Client with mTLS roots (A4)
 │   ├── httpcache/      # cluster body cache + SourceCache (H7)
-│   ├── dns/            # dns-service client wrapper
+│   ├── dns/            # dns-service HTTP client wrapper + local fallback
 │   ├── secretbox/      # I22 AES-256-GCM decrypt (read-only by design)
-│   └── tracing/        # OTel exporter helpers
-├── proto/              # (future) protobuf job payloads when we go cross-language
-├── internal/
-└── docs/
+│   ├── metrics/        # shared prometheus collectors for the worker side
+│   └── tracing/        # OTLP exporter helpers
+├── docs/               # ASSETS / FINDINGS / IDEMPOTENCE / CONCURRENCY / MANIFEST
+├── grafana/            # ready-to-import dashboards for worker-side metrics
+└── CHANGELOG.md
 ```
 
-`internal/` is hidden by Go's tooling — anything outside `worker/` and
-`sdk/` is implementation detail and may change without a SemVer event.
+The `consumes.filter` DSL is parsed inside the controlplane (cascade
+engine), not the SDK · workers receive jobs that already match the
+filter. The SDK only ships the *manifest* type that declares it.
 
 ## Quick example
 
