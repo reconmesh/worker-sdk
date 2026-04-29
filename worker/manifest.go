@@ -27,6 +27,12 @@ type Manifest struct {
 	// Maintainer is a free-form team or individual identifier surfaced
 	// in the UI. Optional.
 	Maintainer string `yaml:"maintainer,omitempty"`
+	// Description is a one-line operator-facing summary of what the
+	// worker does. Surfaced verbatim on the Plugins page so an operator
+	// scanning the catalog can answer "what does tm-vulnx do?" without
+	// drilling into the manifest. Keep it short (one sentence, ~80
+	// chars) so it fits the card layout.
+	Description string `yaml:"description,omitempty"`
 	// Config is the static defaults the tool ships with. Operator
 	// overrides land in PG (tool_configs) and the SDK runtime
 	// deep-merges override over Config before invoking

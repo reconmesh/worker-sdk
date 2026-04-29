@@ -20,6 +20,13 @@ version: 0.1.0
 # UI's "who owns this worker" page.
 maintainer: team-tools
 
+# Optional. One-line operator-facing summary of what the worker does.
+# Surfaced verbatim on the Plugins page so an operator scanning the
+# catalog can answer "what does this do?" without drilling into the
+# manifest. Keep it short (~80 chars / one sentence) so it fits the
+# card layout.
+description: "Short one-line description of what this worker does."
+
 # Required. At least one phase. A binary can serve multiple phases
 # (rare); the worker's Run method branches on Job.Phase.
 phases:
