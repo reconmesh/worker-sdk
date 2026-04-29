@@ -94,6 +94,10 @@ A worker with that body will:
 - `docs/OBSERVABILITY.md` — required metrics + tracing conventions
 - `docs/MANIFEST.md` — the YAML schema in detail
 
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md) for release notes by version.
+
 ## License
 
 MIT.
