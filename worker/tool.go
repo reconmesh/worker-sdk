@@ -189,10 +189,12 @@ const (
 // Finding is one actionable observation.
 //
 // Dedup behavior: the runtime computes a hash from
-// (Kind, Severity, canonicalized Data) and stores it in the
-// findings.dedup_hash column. Re-emitting a finding with the same
-// dedup_hash bumps last_seen rather than inserting a row, so periodic
-// re-scans don't bloat the table. See dedup.go.
+// (Kind, Severity, canonicalized Data) and stamps it as the finding
+// object's `hash` field. Findings live as JSONB elements inside
+// assets.attrs.findings (no separate findings table) · re-emitting
+// a finding with the same hash UPSERT-merges by hash and bumps
+// last_seen rather than appending a new element, so periodic
+// re-scans don't bloat the array. See dedup.go.
 type Finding struct {
 	// Kind is the finding category, short snake_case.
 	// Examples: "tech", "secret", "exposed_git", "weak_tls".
