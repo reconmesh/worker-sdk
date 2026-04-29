@@ -4,6 +4,14 @@ All notable changes to `worker-sdk` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) ·
 this project follows [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- `Manifest.Description` · optional one-line operator-facing summary
+  surfaced on the controlplane Plugins page. YAML round-trip pinned by
+  test (`TestLoadManifest_DescriptionRoundTrip`). Wire-additive · workers
+  without a description still register cleanly.
+
 ## [v0.5.3] - 2026-04-29
 
 Session marathon · all additive · no wire-contract break vs v0.5.2.
