@@ -15,10 +15,9 @@
      - [ ] manually exercised <feature> via <UI / curl / docker compose up>
 -->
 
-## Stage tag
 
-<!-- If this lands a Stage A-K item from the plan, mention it:
-     "Closes Stage I12" / "Part of Stage H4" / "Forward-looking C7".
+<!-- If this lands a item from the plan, mention it:
+     "Closes " / "Part of " / "Forward-looking C7".
      Skip if it's pure maintenance (chore / docs / ci). -->
 
 ## Breaking changes

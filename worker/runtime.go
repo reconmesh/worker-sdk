@@ -159,7 +159,7 @@ func (rt *runtime) Run(ctx context.Context) error {
 
 // applyConfig reads tool_configs.config for this tool, deep-merges
 // it onto the manifest's static config, decrypts manifest-declared
-// secret fields (Stage I22), and hands the result to
+// secret fields, and hands the result to
 // Tool.ReloadConfig. Best-effort - a transient PG error logs and
 // returns; the worker keeps running with whatever config it had.
 //
@@ -167,7 +167,7 @@ func (rt *runtime) Run(ctx context.Context) error {
 // override wins on key conflict; nested maps recurse; arrays /
 // scalars in override replace the manifest value wholesale.
 //
-// Decrypt rule (I22): for every dotted-path in manifest.Secrets,
+// Decrypt rule: for every dotted-path in manifest.Secrets,
 // if the merged value is "enc:v1:..." we Decrypt with
 // $RECON_SECRETS_KEY. A failed decrypt leaves the ciphertext in
 // place + logs the path - the worker's downstream HTTP call then

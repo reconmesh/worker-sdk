@@ -6,7 +6,7 @@ import (
 	"go.uber.org/goleak"
 )
 
-// TestMain wires goleak (Stage A5). The dns package owns the LRU
+// TestMain wires goleak. The dns package owns the LRU
 // cache + the tm-resolve dial-and-stream path; both are
 // goroutine-light today (no background loops in this package - the
 // dns-service binary owns those) but the tripwire catches a future

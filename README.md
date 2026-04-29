@@ -34,12 +34,12 @@ worker-sdk/
 │   ├── serve.go        # Serve() entry point: River + signal handling
 │   ├── runtime.go      # PG pool, metrics, OTel, config reload
 │   ├── river_adapter.go# River JobArgs binding + worker registration
-│   ├── asset_writer.go # UpsertAsset + sync.Pool fingerprint (G1, -27% bytes/op)
+│ ├── asset_writer.go # UpsertAsset + sync.Pool fingerprint (G1, -27% bytes/op)
 │   ├── dedup.go        # finding hash canonicalization
 │   └── once.go         # --once / --asset synthetic-job mode (no DB, no River)
 ├── sdk/                # opt-in helpers · workers import only what they need
-│   ├── mtls/           # cleanhttp-style http.Client with mTLS roots (A4)
-│   ├── httpcache/      # cluster body cache + SourceCache (H7)
+│ ├── mtls/ # cleanhttp-style http.Client with mTLS roots
+│ ├── httpcache/ # cluster body cache + SourceCache
 │   ├── dns/            # dns-service HTTP client wrapper + local fallback
 │   ├── secretbox/      # I22 AES-256-GCM decrypt (read-only by design)
 │   ├── metrics/        # shared prometheus collectors for the worker side

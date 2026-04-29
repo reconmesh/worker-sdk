@@ -1,5 +1,5 @@
 // Package secretbox decrypts manifest-declared secret config fields
-// at scan time (Stage I22 worker-side close).
+// at scan time.
 //
 // Workers consume controlplane-encrypted values that arrive as
 // `enc:v1:<base64url nonce + ciphertext + tag>` strings in the

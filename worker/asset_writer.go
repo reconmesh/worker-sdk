@@ -304,7 +304,7 @@ func (w *AssetWriter) SetParentChain(ctx context.Context, childID, parentID uuid
 // 1000 assets at peak chews through 1000 SHA hashers + 1000 JSON
 // byte slices per second. We pool both via sync.Pool · the hasher
 // has a per-instance internal buffer (~200B), and the bytes.Buffer
-// reuse spares the json.Marshal heap alloc. Bench (G1) measured
+// reuse spares the json.Marshal heap alloc. Bench measured
 // -27% bytes/op vs the unpooled version.
 func fingerprintAttrs(attrs map[string]any) []byte {
 	h := hasherPool.Get().(hash.Hash)

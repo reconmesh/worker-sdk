@@ -27,17 +27,6 @@ labels: enhancement
      - blocking: "this blocks <use case>" / "nice-to-have"
 -->
 
-## Stage tag
-
-<!-- Map to the plan if possible:
-     - A-G: original Stage A-G items (most shipped, but maintenance
-       items still possible)
-     - H1-H15: UI/UX innovations
-     - I1-I22: backend features (I10/I23/I25 explicitly excluded)
-     - J1-J5: workers
-     - K: weaksecrets
-     - C1-C11: forward-looking opportunistic (see ROADMAP.md)
--->
 
 ## Out of scope
 

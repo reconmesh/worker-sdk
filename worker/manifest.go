@@ -41,7 +41,7 @@ type Manifest struct {
 	// UI can show defaults vs override.
 	Config map[string]any `yaml:"config,omitempty"`
 	// Secrets is the dotted-path list of config fields encrypted at
-	// rest (Stage I22). The controlplane API masks these as "***"
+	// rest. The controlplane API masks these as "***"
 	// in GET responses and encrypts via AES-256-GCM on PUT. The SDK
 	// runtime decrypts them on the worker side before passing the
 	// merged config to ReloadConfig - workers see plaintext API

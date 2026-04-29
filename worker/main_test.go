@@ -7,7 +7,7 @@ import (
 )
 
 // TestMain wires goleak so the worker package's tests fail loudly
-// on goroutine leaks (Stage A5).
+// on goroutine leaks.
 //
 // The worker package owns the runtime loop, the dispatcher pool,
 // the cascade replay path, and the dedup-bookkeeping ticker - every

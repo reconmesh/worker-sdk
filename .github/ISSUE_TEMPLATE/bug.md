@@ -32,8 +32,7 @@ labels: bug
 - module / worker affected: <name + tag>
 - OS / Docker: <e.g. Linux 6.1, Docker 27>
 
-## Stage tag (if applicable)
 
-<!-- If this is regression on a previously-shipped Stage A-K item,
+<!-- If this is regression on a previously-shipped item,
      name it. Helps triage decide whether it's a recent shipment
      issue or a long-standing gap. -->
