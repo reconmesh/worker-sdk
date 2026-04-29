@@ -156,6 +156,30 @@ func NewHealthError(class, message string) *HealthError {
 	return &HealthError{Class: class, Message: message}
 }
 
+// BulkRunner is an OPTIONAL interface workers implement to amortize
+// expensive per-Run setup (template loading, HTTP client warmup,
+// rate-limiter init) across many jobs in one call.
+//
+// Use cases:
+//   - tools that boot heavy state per Run() · template-loaders
+//     like nuclei, signature dumps like trufflehog
+//   - SaaS APIs that expose a /bulk endpoint where many targets
+//     fit in one request
+//
+// The River adapter detects this interface at startup. When set,
+// it accumulates up to BulkSize() jobs (waiting up to a small
+// fill-window before flushing partial bulks) and calls
+// RunBulk(ctx, jobs) once with the batch. Result slice MUST be
+// 1:1 with jobs (jobs[i] → results[i]) · contract violation is
+// reported as a fatal error.
+//
+// Workers return BulkSize() ≤ 1 to fall back to per-Run invocation.
+type BulkRunner interface {
+	Tool
+	RunBulk(ctx context.Context, jobs []Job) ([]Result, error)
+	BulkSize() int
+}
+
 // Job is the input to Tool.Run.
 //
 // Field stability: every field here is part of the wire contract.
