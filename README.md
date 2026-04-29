@@ -32,15 +32,22 @@ worker-sdk/
 │   ├── manifest.go     # YAML manifest schema + load/validate
 │   ├── serve.go        # Serve() entry point: River + signal handling
 │   ├── runtime.go      # PG pool, metrics, OTel
+│   ├── asset_writer.go # UpsertAsset + sync.Pool fingerprint (G1)
 │   ├── dedup.go        # finding hash canonicalization
 │   └── filter/         # `consumes.filter` parser + PG predicate compile
+├── sdk/                # opt-in helpers · workers import only what they need
+│   ├── mtls/           # cleanhttp-style http.Client with mTLS roots
+│   ├── httpcache/      # cluster body cache + SourceCache (H7)
+│   ├── dns/            # dns-service client wrapper
+│   ├── secretbox/      # I22 AES-256-GCM decrypt (read-only by design)
+│   └── tracing/        # OTel exporter helpers
 ├── proto/              # (future) protobuf job payloads when we go cross-language
 ├── internal/
 └── docs/
 ```
 
-`internal/` is hidden by Go's tooling — anything outside `worker/` is
-implementation detail and may change without a SemVer event.
+`internal/` is hidden by Go's tooling — anything outside `worker/` and
+`sdk/` is implementation detail and may change without a SemVer event.
 
 ## Quick example
 
