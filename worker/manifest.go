@@ -57,6 +57,26 @@ type Manifest struct {
 	// with garbage credentials - the manifest is the source of
 	// truth on what's a secret.
 	Secrets []string `yaml:"secrets,omitempty"`
+	// ExternalLists declares the operator-managed lists this worker
+	// wants the controlplane to fetch on its behalf. Each entry seeds
+	// a row in the controlplane's external_lists table on worker
+	// registration if it doesn't already exist; the operator can edit
+	// the URL / cadence / enabled flag from the admin UI. The fetched
+	// content lands in the worker's merged config under
+	// `lists.<name>.content` (raw bytes as a string) so the worker
+	// reads it via the existing Configurable.ReloadConfig path.
+	//
+	// Use case: tm-resolve / tm-subfind want a community resolvers
+	// file that ships current with operator preference, not the
+	// snapshot baked into the binary.
+	ExternalLists []ExternalListSpec `yaml:"external_lists,omitempty"`
+	// Readme is the long-form docs surfaced on the per-module admin
+	// page. Populated at SDK runtime by reading ./README.md (or the
+	// path set via WORKER_README_PATH env override) at boot. Not
+	// authored in the YAML manifest - it's filled in by the SDK after
+	// LoadManifest returns. Excluded from yaml.Marshal so a round-trip
+	// of an on-disk manifest doesn't churn.
+	Readme string `yaml:"-" json:"readme,omitempty"`
 	// Phases declares one or more pipeline phases this worker handles.
 	// A single binary can serve several phases by branching in Run on
 	// Job.Phase; this is rare in practice.
@@ -237,6 +257,29 @@ type ProduceSpec struct {
 	// by the UI to pre-populate filter dropdowns even before any
 	// finding has been observed.
 	FindingKinds []string `yaml:"finding_kinds,omitempty"`
+}
+
+// ExternalListSpec is one entry in Manifest.ExternalLists. Workers
+// declare the lists they want; the controlplane seeds a row in the
+// external_lists table on first registration if no row with that
+// name exists. The operator owns the row from then on (URL,
+// cadence, enabled flag are operator-editable from the admin UI).
+type ExternalListSpec struct {
+	// Name is the contract between worker and controlplane. The
+	// fetched content lands in the worker's merged config under
+	// `lists.<name>.content` (string of raw bytes). MUST match the
+	// row that's seeded on registration. Convention: snake_case.
+	Name string `yaml:"name"`
+	// DefaultURL is the seed value for the row's `url` column. The
+	// operator can change it at any time via the admin UI; the worker
+	// keeps reading whatever the operator points at.
+	DefaultURL string `yaml:"default_url"`
+	// Description is operator-facing text shown next to the URL on
+	// the admin page. Optional.
+	Description string `yaml:"description,omitempty"`
+	// RefreshIntervalSeconds is the seed cadence. 0 = controlplane
+	// default (24h). Operator can override per row.
+	RefreshIntervalSeconds int `yaml:"refresh_interval_seconds,omitempty"`
 }
 
 // LoadManifest reads + validates a manifest from path. The standard

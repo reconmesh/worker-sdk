@@ -49,6 +49,11 @@ func Serve(t Tool) {
 		die("manifest tool=%q but Tool.Name()=%q - mismatch",
 			manifest.Tool, t.Name())
 	}
+	// Best-effort attach README content. Default location is
+	// ./README.md next to the binary; override via WORKER_README_PATH.
+	// A missing file is non-fatal · the controlplane just shows a
+	// "no docs" placeholder on the admin page.
+	manifest.Readme = loadReadme(os.Getenv("WORKER_README_PATH"))
 	if cfg.ValidateOnly {
 		fmt.Printf("manifest %s v%s OK (%d phase(s))\n",
 			manifest.Tool, manifest.Version, len(manifest.Phases))
@@ -141,6 +146,37 @@ func manifestNextToBinary() string {
 		return "manifest.yaml"
 	}
 	return filepath.Join(filepath.Dir(exe), "manifest.yaml")
+}
+
+// loadReadme resolves the README path and returns its content as a
+// string, or "" when missing or oversized. Truncation cap of 256 KiB
+// keeps a runaway README out of the controlplane registration channel.
+//
+// Lookup order:
+//   1. WORKER_README_PATH env if non-empty
+//   2. ./README.md next to the binary
+//   3. ./README.md relative to cwd (devloop case · `air` runs from src)
+func loadReadme(override string) string {
+	const maxBytes = 256 * 1024
+	candidates := []string{}
+	if override != "" {
+		candidates = append(candidates, override)
+	}
+	if exe, err := os.Executable(); err == nil {
+		candidates = append(candidates, filepath.Join(filepath.Dir(exe), "README.md"))
+	}
+	candidates = append(candidates, "README.md")
+	for _, p := range candidates {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		if len(b) > maxBytes {
+			b = b[:maxBytes]
+		}
+		return string(b)
+	}
+	return ""
 }
 
 func parseLevel(s string) slog.Level {

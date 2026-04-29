@@ -1,12 +1,15 @@
 package worker
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -181,9 +184,75 @@ func (rt *runtime) applyConfig(ctx context.Context) error {
 	}
 	merged := rt.fetchMergedConfig(ctx)
 	rt.decryptSecrets(merged)
+	rt.injectExternalLists(ctx, merged)
 	loadCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	return cfg.ReloadConfig(loadCtx, merged)
+}
+
+// injectExternalLists pulls the latest content for every list this
+// worker's manifest declares and writes it into the merged config
+// under `lists.<name>.content` (raw bytes as a string). Workers
+// read this in their own ReloadConfig handler.
+//
+// Source: external_lists table in the controlplane PG. We hit the
+// content_gz column directly (single round-trip per list) so this
+// adds at most N roundtrips per ReloadConfig pass · negligible vs
+// the JSONB merge above.
+func (rt *runtime) injectExternalLists(ctx context.Context, merged map[string]any) {
+	if len(rt.manifest.ExternalLists) == 0 {
+		return
+	}
+	lists := map[string]any{}
+	for _, l := range rt.manifest.ExternalLists {
+		content, hash, status, err := rt.fetchListContent(ctx, l.Name)
+		if err != nil {
+			rt.logger.Warn("external_list fetch",
+				"name", l.Name, "error", err)
+			continue
+		}
+		lists[l.Name] = map[string]any{
+			"content":      string(content),
+			"content_hash": hash,
+			"status":       status,
+		}
+	}
+	if len(lists) > 0 {
+		merged["lists"] = lists
+	}
+}
+
+// fetchListContent reads + gunzips one row's content_gz blob. Empty
+// row (never fetched) returns an empty content string with status
+// pending; that lets the worker fall back to its hard-coded default.
+func (rt *runtime) fetchListContent(ctx context.Context, name string) ([]byte, string, string, error) {
+	if rt.pool == nil {
+		return nil, "", "", fmt.Errorf("no PG pool")
+	}
+	var (
+		gz     []byte
+		hash   string
+		status string
+	)
+	err := rt.pool.QueryRow(ctx, `
+		SELECT COALESCE(content_gz, ''::bytea),
+		       COALESCE(content_hash, ''),
+		       last_status
+		  FROM external_lists
+		 WHERE name = $1`, name).Scan(&gz, &hash, &status)
+	if err != nil {
+		return nil, "", "", err
+	}
+	if len(gz) == 0 {
+		return nil, hash, status, nil
+	}
+	r, err := gzip.NewReader(bytes.NewReader(gz))
+	if err != nil {
+		return nil, hash, status, err
+	}
+	defer r.Close()
+	body, err := io.ReadAll(r)
+	return body, hash, status, err
 }
 
 // decryptSecrets is the I22 worker-side close. Read the cluster
