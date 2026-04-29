@@ -1,0 +1,30 @@
+# EditorConfig · cross-editor file-handling consistency.
+# Spec: https://editorconfig.org/
+
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+trim_trailing_whitespace = true
+indent_style = tab
+indent_size = 4
+
+# Go convention · tab indent.
+[*.go]
+indent_style = tab
+
+# YAML / JSON / Markdown · 2-space soft indent.
+[*.{yaml,yml,json,md}]
+indent_style = space
+indent_size = 2
+
+# Makefiles need real tabs.
+[Makefile]
+indent_style = tab
+
+# TypeScript / JavaScript / CSS · 2-space soft indent (matches Prettier).
+[*.{ts,tsx,js,jsx,css,html}]
+indent_style = space
+indent_size = 2
