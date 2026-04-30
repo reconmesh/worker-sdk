@@ -28,7 +28,7 @@ this project follows [Semantic Versioning](https://semver.org/).
   page with auto-generated notes + a body pointing at CHANGELOG.md.
   The library doesn't ship binaries, but consumer module-maintainers
   bumping `require worker-sdk vX.Y.Z` can now browse releases at
-  git.vozec.lan/Parabellum/worker-sdk/releases instead of scrolling git log.
+  git.vozec.fr/Parabellum/worker-sdk/releases instead of scrolling git log.
 
 ### Fixed
 - `Manifest.Validate` accepted `priority_hint` 0..4; widened to 0..9.

@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"git.vozec.lan/Parabellum/worker-sdk/worker"
+	"git.vozec.fr/Parabellum/worker-sdk/worker"
 )
 
 // JobBuilder fluently constructs a [worker.Job] for tests. Defaults:

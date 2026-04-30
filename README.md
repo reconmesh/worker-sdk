@@ -61,7 +61,7 @@ package main
 import (
     "context"
 
-    "git.vozec.lan/Parabellum/worker-sdk/worker"
+    "git.vozec.fr/Parabellum/worker-sdk/worker"
 )
 
 type MyTool struct{}

@@ -15,8 +15,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"git.vozec.lan/Parabellum/worker-sdk/sdk/metrics"
-	"git.vozec.lan/Parabellum/worker-sdk/sdk/tracing"
+	"git.vozec.fr/Parabellum/worker-sdk/sdk/metrics"
+	"git.vozec.fr/Parabellum/worker-sdk/sdk/tracing"
 )
 
 // cascadeWorker bridges River's typed worker contract to the user-

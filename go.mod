@@ -1,4 +1,4 @@
-module git.vozec.lan/Parabellum/worker-sdk
+module git.vozec.fr/Parabellum/worker-sdk
 
 go 1.26.2
 

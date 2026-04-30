@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"git.vozec.lan/Parabellum/worker-sdk/sdk/tracing"
+	"git.vozec.fr/Parabellum/worker-sdk/sdk/tracing"
 )
 
 // Serve is the worker's entry point. It:
