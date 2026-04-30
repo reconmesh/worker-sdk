@@ -55,7 +55,7 @@ func (rt *runtime) healthLoop(ctx context.Context) {
 //   3. Default "unknown"
 func (rt *runtime) reportHealth(ctx context.Context) {
 	report := rt.gatherHealth(ctx)
-	if err := rt.upsertHealth(ctx, report); err != nil {
+	if err := rt.upsertHealth(ctx, report, ""); err != nil {
 		rt.logger.Warn("module_health upsert failed",
 			"tool", rt.manifest.Tool, "error", err)
 	}
@@ -105,8 +105,11 @@ func (rt *runtime) gatherHealth(ctx context.Context) HealthReport {
 
 // upsertHealth writes one row to module_health using the Tool name
 // as the PK. Fails-safe · a transient PG error doesn't kill the
-// loop.
-func (rt *runtime) upsertHealth(ctx context.Context, r HealthReport) error {
+// loop. apiKeyID, when non-empty, populates failed_api_key_id so
+// the controlplane auditor can flip the EXACT api_keys row that
+// caused the failure (vs. the heuristic "most-recently-used active"
+// fallback).
+func (rt *runtime) upsertHealth(ctx context.Context, r HealthReport, apiKeyID string) error {
 	if rt.pool == nil {
 		return errors.New("no PG pool")
 	}
@@ -116,18 +119,29 @@ func (rt *runtime) upsertHealth(ctx context.Context, r HealthReport) error {
 	if extraJSON == nil || string(extraJSON) == "null" {
 		extraJSON = []byte("{}")
 	}
+	// $6 is the optional failed_api_key_id (nil clears the column on
+	// healthy / unrelated-failure transitions; a uuid sets it on
+	// api_key_invalid / api_key_quota_exceeded). The CASE clauses on
+	// status keep healthy transitions from leaving stale failure
+	// state behind.
+	var failedID any = nil
+	if apiKeyID != "" && (r.Class == "api_key_invalid" || r.Class == "api_key_quota_exceeded") {
+		failedID = apiKeyID
+	}
 	const q = `
 		INSERT INTO module_health
 		    (tool, status, error_class, error_message, last_check_at,
 		     last_success_at, last_failure_at,
-		     consecutive_failures, failures_24h, successes_24h, extra)
+		     consecutive_failures, failures_24h, successes_24h, extra,
+		     failed_api_key_id)
 		VALUES ($1, $2, $3, $4, now(),
 		        CASE WHEN $2 = 'healthy' THEN now() ELSE NULL END,
 		        CASE WHEN $2 != 'healthy' AND $2 != 'unknown' THEN now() ELSE NULL END,
 		        CASE WHEN $2 != 'healthy' AND $2 != 'unknown' THEN 1 ELSE 0 END,
 		        CASE WHEN $2 != 'healthy' AND $2 != 'unknown' THEN 1 ELSE 0 END,
 		        CASE WHEN $2 = 'healthy' THEN 1 ELSE 0 END,
-		        $5::jsonb)
+		        $5::jsonb,
+		        $6::uuid)
 		ON CONFLICT (tool) DO UPDATE SET
 		    status = EXCLUDED.status,
 		    error_class = EXCLUDED.error_class,
@@ -152,17 +166,26 @@ func (rt *runtime) upsertHealth(ctx context.Context, r HealthReport) error {
 		        THEN module_health.successes_24h + 1
 		        ELSE module_health.successes_24h
 		    END,
-		    extra = $5::jsonb`
+		    extra = $5::jsonb,
+		    failed_api_key_id = CASE
+		        WHEN $2 = 'healthy' THEN NULL
+		        WHEN $6::uuid IS NOT NULL THEN $6::uuid
+		        ELSE module_health.failed_api_key_id
+		    END`
 	_, err := rt.pool.Exec(wctx, q,
 		rt.manifest.Tool, r.Status, r.Class, r.Message, string(extraJSON),
+		failedID,
 	)
 	return err
 }
 
 // recordRunOutcome bumps the passive counters used by gatherHealth
 // when the Tool doesn't implement Healthchecker. Called from the
-// River adapter after each Run() invocation.
-func (rt *runtime) recordRunOutcome(err error) {
+// River adapter after each Run() invocation. apiKeyID is the value
+// from Job.APIKeyID (empty string when no pool entry was used);
+// it's threaded down to module_health.failed_api_key_id when the
+// run failed with an api_key_* HealthError class.
+func (rt *runtime) recordRunOutcome(err error, apiKeyID string) {
 	atomic.AddInt32(&rt.totalRuns, 1)
 	if err == nil {
 		atomic.StoreInt32(&rt.consecutiveFailures, 0)
@@ -179,6 +202,6 @@ func (rt *runtime) recordRunOutcome(err error) {
 			Class:   herr.Class,
 			Message: herr.Message,
 		}
-		go rt.upsertHealth(context.Background(), report)
+		go rt.upsertHealth(context.Background(), report, apiKeyID)
 	}
 }

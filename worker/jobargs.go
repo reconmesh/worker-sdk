@@ -28,6 +28,13 @@ type CascadeArgs struct {
 	// by manual rescan / scan endpoints; cron leaves it false so the
 	// recheck wave benefits from warm caches.
 	ForceFresh bool `json:"force_fresh,omitempty"`
+	// APIKeyID, when non-nil, identifies the api_keys row the
+	// controlplane round-robin selector picked for this dispatch.
+	// The runtime fetches the value, decrypts it, and exposes it as
+	// Job.APIKey to Tool.Run · the tool can use it transparently
+	// without knowing the row exists. nil means "no pool entry" ·
+	// the tool falls back to its config-loaded api_key.
+	APIKeyID *uuid.UUID `json:"api_key_id,omitempty"`
 }
 
 // Kind satisfies river.JobArgs. River dispatches jobs to the worker

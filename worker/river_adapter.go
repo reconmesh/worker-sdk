@@ -95,6 +95,21 @@ func (w *cascadeWorker) Work(ctx context.Context, j *river.Job[CascadeArgs]) err
 	if dl, ok := ctx.Deadline(); ok {
 		job.Deadline = dl
 	}
+	// Resolve the api_keys row picked by the controlplane round-robin
+	// selector. Best-effort: any failure leaves Job.APIKey empty and
+	// the tool falls back to its config-loaded api_key. The fetch is
+	// a single PG round-trip; the worker already holds a long-lived
+	// pool so the cost is negligible.
+	if j.Args.APIKeyID != nil && w.rt != nil && w.rt.pool != nil {
+		idStr := j.Args.APIKeyID.String()
+		if val, err := fetchAPIKeyValue(ctx, w.rt.pool, w.rt.secretsKey, idStr); err == nil && val != "" {
+			job.APIKey = val
+			job.APIKeyID = idStr
+		} else if err != nil {
+			w.logger.Warn("api_key fetch failed · falling back to config",
+				"key_id", idStr, "error", err)
+		}
+	}
 
 	start := time.Now()
 	tool := w.tool.Name()
@@ -113,7 +128,7 @@ func (w *cascadeWorker) Work(ctx context.Context, j *river.Job[CascadeArgs]) err
 	res, err := w.tool.Run(ctx, job)
 	metrics.JobDuration.WithLabelValues(tool, phase).Observe(time.Since(start).Seconds())
 	if w.rt != nil {
-		w.rt.recordRunOutcome(err)
+		w.rt.recordRunOutcome(err, job.APIKeyID)
 	}
 	if err != nil {
 		metrics.JobsTotal.WithLabelValues(tool, phase, "error").Inc()
@@ -135,6 +150,15 @@ func (w *cascadeWorker) Work(ctx context.Context, j *river.Job[CascadeArgs]) err
 
 	if err := w.persist(ctx, j.Args, res); err != nil {
 		return fmt.Errorf("persist result: %w", err)
+	}
+	// SecretFeedback path: when the tool reported upstream-side
+	// quota / expiry telemetry, push it back into the api_keys row.
+	// Best-effort, never fatal · the run already succeeded.
+	if res.SecretFeedback != nil && job.APIKeyID != "" && w.rt != nil && w.rt.pool != nil {
+		if err := persistSecretFeedback(ctx, w.rt.pool, job.APIKeyID, res.SecretFeedback); err != nil {
+			w.logger.Warn("api_key SecretFeedback persist failed",
+				"key_id", job.APIKeyID, "error", err)
+		}
 	}
 	return nil
 }

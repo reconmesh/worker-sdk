@@ -221,6 +221,25 @@ type Job struct {
 	// still write to the cache after the fresh fetch so future
 	// non-fresh callers benefit.
 	ForceFresh bool
+	// APIKey is the plaintext credential the controlplane selected
+	// for this job from the api_keys round-robin pool. Tools that
+	// declare `secrets: [api_key]` should prefer this over the
+	// config-loaded value · the cluster spreads load across the
+	// pool by picking a different APIKeyID each dispatch.
+	//
+	// Empty string means "no pool entry available" · fall back to
+	// the manifest config.api_key (legacy single-key path). Tools
+	// stay back-compatible by checking `if j.APIKey != ""` before
+	// using it; otherwise the existing tool_configs.config.api_key
+	// flow keeps working unchanged.
+	APIKey string
+	// APIKeyID identifies the api_keys row APIKey was sourced from.
+	// Tools that want their HealthError to flip the EXACT row that
+	// failed (rather than the heuristic "most-recently-used active"
+	// match) must thread this through to the Healthcheck failure
+	// path. The runtime captures it automatically when Run returns
+	// a *HealthError, so most tools never touch it.
+	APIKeyID string
 }
 
 // Result is the output of Tool.Run.
@@ -242,6 +261,32 @@ type Result struct {
 	// Stats is free-form metric contribution to the run summary.
 	// Surfaced on /api/runs/{id} under the worker's name.
 	Stats map[string]any
+	// SecretFeedback (optional) carries upstream-reported credential
+	// metadata back to the controlplane: the api_keys row's
+	// expires_at, quota_remaining, quota_limit. Tools populate this
+	// when their target API exposes a /api-info-style endpoint
+	// (VirusTotal /api/v3/users/<key>, Shodan /api-info, etc.) so
+	// the central registry stays in sync without manual edits. nil
+	// means "no feedback to record" · the existing fields stay
+	// untouched.
+	SecretFeedback *SecretFeedback
+}
+
+// SecretFeedback is the wire shape for module-reported credential
+// telemetry. The runtime persists every non-nil field into the
+// matching api_keys row keyed on Job.APIKeyID. Fields are pointers
+// so a module can update one without overwriting the others.
+type SecretFeedback struct {
+	// ExpiresAt, when non-nil, replaces api_keys.expires_at. The
+	// UI flips the relative-hint colour when the date is < 7 days
+	// away (amber) or in the past (red).
+	ExpiresAt *time.Time
+	// QuotaRemaining + QuotaLimit, when non-nil, populate the
+	// upstream_quota_* columns. Distinct from quota_used /
+	// quota_limit which track the cluster's local accounting; the
+	// "upstream" view is what the vendor reports when asked.
+	QuotaRemaining *int
+	QuotaLimit     *int
 }
 
 // Asset is one node in the discovery graph.
