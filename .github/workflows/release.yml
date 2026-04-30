@@ -21,7 +21,7 @@ jobs:
     steps:
       - name: bootstrap deps (alpine docker:24-cli base)
         run: apk add --no-cache git bash curl ca-certificates wget tar
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with: { fetch-depth: 0 }
       - uses: softprops/action-gh-release@v2
         with:
