@@ -54,8 +54,8 @@ func startPG(t *testing.T) *pgxpool.Pool {
 	}
 	t.Cleanup(pool.Close)
 	for _, p := range []string{
-		"../../../recon-platform/migrations/0001_init.up.sql",
-		"../../../recon-platform/migrations/0003_body_history.up.sql",
+		"../../../platform/migrations/0001_init.up.sql",
+		"../../../platform/migrations/0003_body_history.up.sql",
 	} {
 		schema, err := os.ReadFile(p)
 		if err != nil {

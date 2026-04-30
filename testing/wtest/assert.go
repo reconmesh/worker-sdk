@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/reconmesh/worker-sdk/worker"
+	"git.vozec.lan/Parabellum/worker-sdk/worker"
 )
 
 // AssertEmits fails the test if result.NewAssets does not contain at

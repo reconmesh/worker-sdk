@@ -6,7 +6,7 @@ HTTP, asserting the shape of `worker.Result`, exercising `ReloadConfig`
 branches and the `error_class` taxonomy on `worker.HealthError`.
 
 The library is **additive**. Existing tests keep working; new tests opt in by
-importing `github.com/reconmesh/worker-sdk/testing/wtest`.
+importing `git.vozec.lan/Parabellum/worker-sdk/testing/wtest`.
 
 ## What it covers
 
@@ -96,7 +96,7 @@ func TestRun_HappyPath(t *testing.T) {
 ## The single import a downstream test file adds
 
 ```go
-import "github.com/reconmesh/worker-sdk/testing/wtest"
+import "git.vozec.lan/Parabellum/worker-sdk/testing/wtest"
 ```
 
 That's it.

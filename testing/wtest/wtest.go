@@ -1,5 +1,5 @@
 // Package wtest is a test harness for tm-* worker modules built on
-// github.com/reconmesh/worker-sdk/worker.
+// git.vozec.lan/Parabellum/worker-sdk/worker.
 //
 // It is purely additive: existing tests keep working, new tests opt in
 // by importing this package. The goals are:
@@ -31,7 +31,7 @@
 // github.com/google/uuid (already pulled in by the SDK).
 package wtest
 
-import "github.com/reconmesh/worker-sdk/worker"
+import "git.vozec.lan/Parabellum/worker-sdk/worker"
 
 // Severity aliases the worker package's severity scale so test files
 // don't have to import the worker package solely for the constants.

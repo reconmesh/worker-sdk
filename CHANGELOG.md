@@ -28,7 +28,7 @@ this project follows [Semantic Versioning](https://semver.org/).
   page with auto-generated notes + a body pointing at CHANGELOG.md.
   The library doesn't ship binaries, but consumer module-maintainers
   bumping `require worker-sdk vX.Y.Z` can now browse releases at
-  github.com/reconmesh/worker-sdk/releases instead of scrolling git log.
+  git.vozec.lan/Parabellum/worker-sdk/releases instead of scrolling git log.
 
 ### Fixed
 - `Manifest.Validate` accepted `priority_hint` 0..4; widened to 0..9.
@@ -64,7 +64,7 @@ Session marathon · all additive · no wire-contract break vs v0.5.2.
 - `httpcache.SourceCache` · per-(url_hash, source_path) persistence
   for original sources recovered from `.map` sourcemap v3 archives
   (H7/C2 chain). Wraps `tm_extracted_sources` table from
-  `recon-platform` migration `0016`.
+  `platform` migration `0016`.
 - `httpcache.Cache.Pool()` accessor · exposes the underlying
   pgxpool so a sister cache (`SourceCache`) can attach without
   doubling the connection set.

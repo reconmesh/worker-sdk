@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/reconmesh/worker-sdk/sdk/mtls"
+	"git.vozec.lan/Parabellum/worker-sdk/sdk/mtls"
 )
 
 // DiscoveredRecord is one row tm-subfind (or any future enumeration

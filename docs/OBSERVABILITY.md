@@ -1,6 +1,6 @@
 # Observability conventions
 
-What every reconmesh worker exposes for free, and what your `Run`
+What every parabellum worker exposes for free, and what your `Run`
 function should add when it does something interesting.
 
 ## What the SDK gives you
@@ -11,7 +11,7 @@ function should add when it does something interesting.
 ### Free metrics
 
 The SDK registers these on the Prometheus default registry. Scrape
-them via `recon-platform/deploy/prometheus.yml` (already wired):
+them via `platform/deploy/prometheus.yml` (already wired):
 
 - `recon_worker_jobs_total{tool, phase, outcome}`: counter, every
   Run() invocation. `outcome` is `success` / `error` / `timeout` /
@@ -50,7 +50,7 @@ Errors are recorded via `span.RecordError(err)`. Timeouts get
 `status=Timeout`.
 
 For child spans inside `Run()` (e.g. one span per outbound HTTP),
-use `otel.Tracer("reconmesh.worker").Start(ctx, "<descriptive name>")`.
+use `otel.Tracer("parabellum.worker").Start(ctx, "<descriptive name>")`.
 The cascade engine in controlplane is the parent of the run span;
 the controlplane API is the parent of the cascade dispatch.
 
@@ -107,7 +107,7 @@ slog.InfoContext(ctx, "starting NVD live lookup",
 
 ## Dashboards
 
-`recon-platform/deploy/grafana/dashboards/reconmesh-overview.json`
+`platform/deploy/grafana/dashboards/parabellum-overview.json`
 auto-imports on `make up-stats`. Shows:
 
 - Cluster job-rate (jobs/sec across all workers)

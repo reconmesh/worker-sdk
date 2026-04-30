@@ -1,6 +1,6 @@
 # worker-sdk
 
-Shared Go library every reconmesh worker links against. Carries the wire
+Shared Go library every parabellum worker links against. Carries the wire
 contract between the control plane and the workers, plus the runtime
 plumbing every worker would otherwise re-implement: River subscription,
 Postgres pool, OpenTelemetry tracing, Prometheus metrics, finding
@@ -61,7 +61,7 @@ package main
 import (
     "context"
 
-    "github.com/reconmesh/worker-sdk/worker"
+    "git.vozec.lan/Parabellum/worker-sdk/worker"
 )
 
 type MyTool struct{}

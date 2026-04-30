@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/reconmesh/worker-sdk/worker"
+	"git.vozec.lan/Parabellum/worker-sdk/worker"
 )
 
 // recordT is a minimal testing.TB that records Errorf / Fatalf calls

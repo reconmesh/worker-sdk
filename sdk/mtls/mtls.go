@@ -5,9 +5,9 @@
 // the helper returns http.DefaultClient. Operators who deploy with
 // gen-certs.sh export:
 //
-//	RECONMESH_TLS_CA   /etc/reconmesh/tls/ca.crt
-//	RECONMESH_TLS_CERT /etc/reconmesh/tls/worker.crt
-//	RECONMESH_TLS_KEY  /etc/reconmesh/tls/worker.key
+//	PARABELLUM_TLS_CA   /etc/reconmesh/tls/ca.crt
+//	PARABELLUM_TLS_CERT /etc/reconmesh/tls/worker.crt
+//	PARABELLUM_TLS_KEY  /etc/reconmesh/tls/worker.key
 //
 // and the helper returns a Client with the right roots + cert.
 //
@@ -59,16 +59,16 @@ var (
 )
 
 func build() (*http.Client, error) {
-	caPath := os.Getenv("RECONMESH_TLS_CA")
-	certPath := os.Getenv("RECONMESH_TLS_CERT")
-	keyPath := os.Getenv("RECONMESH_TLS_KEY")
+	caPath := os.Getenv("PARABELLUM_TLS_CA")
+	certPath := os.Getenv("PARABELLUM_TLS_CERT")
+	keyPath := os.Getenv("PARABELLUM_TLS_KEY")
 	if caPath == "" && certPath == "" && keyPath == "" {
 		// No TLS configured - caller gets the stdlib default. Keeps
 		// dev environments and behind-proxy deployments simple.
 		return http.DefaultClient, nil
 	}
 	if caPath == "" || certPath == "" || keyPath == "" {
-		return nil, errors.New("mtls: set all of RECONMESH_TLS_{CA,CERT,KEY} or none")
+		return nil, errors.New("mtls: set all of PARABELLUM_TLS_{CA,CERT,KEY} or none")
 	}
 	caBytes, err := os.ReadFile(caPath)
 	if err != nil {

@@ -1,4 +1,4 @@
-module github.com/reconmesh/worker-sdk
+module git.vozec.lan/Parabellum/worker-sdk
 
 go 1.26.2
 

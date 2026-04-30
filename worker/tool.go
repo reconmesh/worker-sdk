@@ -1,4 +1,4 @@
-// Package worker is the public surface of the reconmesh worker SDK.
+// Package worker is the public surface of the parabellum worker SDK.
 //
 // A tool author imports this package, implements [Tool], and calls
 // [Serve]. Every other concern - Postgres pool, River subscription,

@@ -21,8 +21,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 
-	"github.com/reconmesh/worker-sdk/sdk/metrics"
-	"github.com/reconmesh/worker-sdk/sdk/secretbox"
+	"git.vozec.lan/Parabellum/worker-sdk/sdk/metrics"
+	"git.vozec.lan/Parabellum/worker-sdk/sdk/secretbox"
 
 	"gopkg.in/yaml.v3"
 )

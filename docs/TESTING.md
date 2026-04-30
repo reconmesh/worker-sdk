@@ -19,7 +19,7 @@ The recommended path for new test code in `tm-*` modules is the
 ## Quick start
 
 ```go
-import "github.com/reconmesh/worker-sdk/testing/wtest"
+import "git.vozec.lan/Parabellum/worker-sdk/testing/wtest"
 
 func TestRun_HappyPath(t *testing.T) {
     rt := wtest.NewRuntime(t) // HTTP + DNS + Cache + ctx, all auto-cleaned

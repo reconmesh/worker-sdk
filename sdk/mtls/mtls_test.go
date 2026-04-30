@@ -18,9 +18,9 @@ import (
 // would fight the table tests. Verify each env-permutation behavior.
 
 func TestBuild_NoEnv_ReturnsDefault(t *testing.T) {
-	t.Setenv("RECONMESH_TLS_CA", "")
-	t.Setenv("RECONMESH_TLS_CERT", "")
-	t.Setenv("RECONMESH_TLS_KEY", "")
+	t.Setenv("PARABELLUM_TLS_CA", "")
+	t.Setenv("PARABELLUM_TLS_CERT", "")
+	t.Setenv("PARABELLUM_TLS_KEY", "")
 	c, err := build()
 	if err != nil {
 		t.Fatalf("build with no env: %v", err)
@@ -32,15 +32,15 @@ func TestBuild_NoEnv_ReturnsDefault(t *testing.T) {
 
 func TestBuild_PartialEnv_Errors(t *testing.T) {
 	cases := []map[string]string{
-		{"RECONMESH_TLS_CA": "/tmp/ca.crt"},
-		{"RECONMESH_TLS_CA": "/tmp/ca.crt", "RECONMESH_TLS_CERT": "/tmp/c.crt"},
-		{"RECONMESH_TLS_CERT": "/tmp/c.crt"},
-		{"RECONMESH_TLS_KEY": "/tmp/c.key"},
+		{"PARABELLUM_TLS_CA": "/tmp/ca.crt"},
+		{"PARABELLUM_TLS_CA": "/tmp/ca.crt", "PARABELLUM_TLS_CERT": "/tmp/c.crt"},
+		{"PARABELLUM_TLS_CERT": "/tmp/c.crt"},
+		{"PARABELLUM_TLS_KEY": "/tmp/c.key"},
 	}
 	for i, env := range cases {
-		t.Setenv("RECONMESH_TLS_CA", env["RECONMESH_TLS_CA"])
-		t.Setenv("RECONMESH_TLS_CERT", env["RECONMESH_TLS_CERT"])
-		t.Setenv("RECONMESH_TLS_KEY", env["RECONMESH_TLS_KEY"])
+		t.Setenv("PARABELLUM_TLS_CA", env["PARABELLUM_TLS_CA"])
+		t.Setenv("PARABELLUM_TLS_CERT", env["PARABELLUM_TLS_CERT"])
+		t.Setenv("PARABELLUM_TLS_KEY", env["PARABELLUM_TLS_KEY"])
 		if _, err := build(); err == nil {
 			t.Errorf("case %d: build with partial env should error, got nil", i)
 		}
@@ -54,9 +54,9 @@ func TestBuild_InvalidCAFile_Errors(t *testing.T) {
 		t.Fatal(err)
 	}
 	cert, key := writeSelfSignedPair(t, dir)
-	t.Setenv("RECONMESH_TLS_CA", caPath)
-	t.Setenv("RECONMESH_TLS_CERT", cert)
-	t.Setenv("RECONMESH_TLS_KEY", key)
+	t.Setenv("PARABELLUM_TLS_CA", caPath)
+	t.Setenv("PARABELLUM_TLS_CERT", cert)
+	t.Setenv("PARABELLUM_TLS_KEY", key)
 	if _, err := build(); err == nil {
 		t.Fatal("expected error for non-PEM CA file")
 	}
@@ -66,9 +66,9 @@ func TestBuild_ValidPair_ReturnsConfiguredClient(t *testing.T) {
 	dir := t.TempDir()
 	cert, key := writeSelfSignedPair(t, dir)
 	// Reuse the cert as its own CA root for the test.
-	t.Setenv("RECONMESH_TLS_CA", cert)
-	t.Setenv("RECONMESH_TLS_CERT", cert)
-	t.Setenv("RECONMESH_TLS_KEY", key)
+	t.Setenv("PARABELLUM_TLS_CA", cert)
+	t.Setenv("PARABELLUM_TLS_CERT", cert)
+	t.Setenv("PARABELLUM_TLS_KEY", key)
 	c, err := build()
 	if err != nil {
 		t.Fatalf("build: %v", err)

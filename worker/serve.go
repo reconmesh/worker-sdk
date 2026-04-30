@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/reconmesh/worker-sdk/sdk/tracing"
+	"git.vozec.lan/Parabellum/worker-sdk/sdk/tracing"
 )
 
 // Serve is the worker's entry point. It:

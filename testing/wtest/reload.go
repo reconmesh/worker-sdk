@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/reconmesh/worker-sdk/worker"
+	"git.vozec.lan/Parabellum/worker-sdk/worker"
 )
 
 // ReloadCase is one case in a [ReloadCases] table. Field is the Go

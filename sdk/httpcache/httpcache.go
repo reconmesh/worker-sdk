@@ -5,7 +5,7 @@
 // cluster, only the 24h cron sweep refreshes.
 //
 // Backed by PG table `tm_http_bodies` (see
-// recon-platform/migrations/0001_init.up.sql). Lookup is keyed by a
+// platform/migrations/0001_init.up.sql). Lookup is keyed by a
 // SHA-256 of the canonical URL so PK lookups are fixed-cost
 // regardless of URL length.
 //

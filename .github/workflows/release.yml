@@ -2,7 +2,7 @@
 # to ship and no Docker image to push. The pipeline exists purely to
 # create a GitHub Release page on every v* tag with auto-generated
 # notes, so consumers (every worker repo) can browse the changelog
-# at github.com/reconmesh/worker-sdk/releases without scrolling git
+# at git.vozec.lan/Parabellum/worker-sdk/releases without scrolling git
 # log.
 #
 # Bumping consumers happens out-of-band: each worker module pins
