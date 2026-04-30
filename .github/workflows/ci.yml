@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   vet-test-build:
-    runs-on: ubuntu-latest
+    runs-on: go
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
