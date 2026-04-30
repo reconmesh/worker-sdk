@@ -17,8 +17,10 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: docker
     steps:
+      - name: bootstrap deps (alpine docker:24-cli base)
+        run: apk add --no-cache git bash curl ca-certificates wget tar
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
       - uses: softprops/action-gh-release@v2
