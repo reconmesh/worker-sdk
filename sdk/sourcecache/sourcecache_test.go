@@ -1,4 +1,4 @@
-package httpcache
+package sourcecache
 
 import (
 	"errors"

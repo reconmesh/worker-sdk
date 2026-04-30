@@ -11,7 +11,7 @@
 // url_hash · operators browsing /assets/{id}/sourcemap.zip want
 // "every source recovered for this JS bundle", regardless of which
 // vendored .map carried each file.
-package httpcache
+package sourcecache
 
 import (
 	"context"
@@ -22,6 +22,14 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// urlHash is the local key derivation. Carved out of the former
+// httpcache.urlHash · the source cache keys on URL the same way
+// so existing tm_extracted_sources rows survive the package move.
+func urlHash(url string) []byte {
+	h := sha256.Sum256([]byte(url))
+	return h[:]
+}
 
 // SourceEntry is one (path, content) pair to upsert. Caller normalizes
 // path before calling (cleanSourcePath in TechMapper) so the PK stays
