@@ -29,11 +29,28 @@ package proxyclient
 
 import (
 	"crypto/x509"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
 	"time"
 )
+
+// loadCAFile reads a PEM file and returns a CertPool containing it.
+// The caller decides what to do on failure (NewFromEnv silently
+// proceeds without a CA pool; explicit Options{}.ProxyCAPool callers
+// can react to the error).
+func loadCAFile(path string) (*x509.CertPool, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(data) {
+		return nil, errors.New("proxyclient: no PEM certificates found in " + path)
+	}
+	return pool, nil
+}
 
 // Options configures New(). Defaults are chosen so a worker calls
 // New(NewFromEnv()) and gets a sensible client. Empty
@@ -83,11 +100,31 @@ type Options struct {
 
 // NewFromEnv assembles Options from the documented env vars. Used by
 // SDK consumers that don't want to thread their own config.
+//
+// Env vars read:
+//   CONTROLPLANE_URL              base URL of the controlplane HTTP API
+//   WORKER_API_TOKEN              bearer for /api/proxy/assignment auth
+//   PARABELLUM_PROXY_CA_PATH      path to parabellum-proxy-ca.crt; loaded
+//                                 into ProxyCAPool. Empty -> SDK trusts
+//                                 only system roots (proxy needs to be
+//                                 trusted via OS bundle at image build
+//                                 time, see scripts/patch-proxy-ca-dockerfile.sh)
 func NewFromEnv() Options {
-	return Options{
+	o := Options{
 		ControlplaneURL: os.Getenv("CONTROLPLANE_URL"),
 		APIToken:        os.Getenv("WORKER_API_TOKEN"),
 	}
+	if path := os.Getenv("PARABELLUM_PROXY_CA_PATH"); path != "" {
+		if pool, err := loadCAFile(path); err == nil {
+			o.ProxyCAPool = pool
+		}
+		// On read/parse failure we silently continue · the SDK falls
+		// back to the system pool. The breaker will trip if the proxy's
+		// forged cert isn't trusted, and the operator sees that in
+		// /healthz. Surfacing here would force every worker boot to
+		// fail-stop on a missing CA file, which is too strict.
+	}
+	return o
 }
 
 // applyDefaults fills zero-valued fields. Called by New().
