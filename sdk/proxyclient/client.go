@@ -218,7 +218,11 @@ func (c *Client) fetchAssignment(ctx context.Context) (*Assignment, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	// Defensive 64KB cap · the assignment payload is a 3-string
+	// JSON envelope (<200 bytes typical). A compromised controlplane
+	// can't saturate the worker's memory by streaming an unbounded
+	// response.
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("proxy assignment: http %d: %s", resp.StatusCode, body)
 	}
