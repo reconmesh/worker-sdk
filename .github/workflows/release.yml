@@ -23,7 +23,7 @@ jobs:
         run: apk add --no-cache git bash curl ca-certificates wget tar
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') }}
